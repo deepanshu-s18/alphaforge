@@ -1,0 +1,18 @@
+# AlphaForge research universe — ~30 liquid US tickers across sectors + 11 SPDR sector ETFs
+# Deterministic: the same config always produces the same cached dataset.
+universe:
+  megacap_tech: [AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, AMD, INTC, CSCO]
+  financials: [JPM, BAC, GS, MS]
+  consumer: [WMT, PG, KO, PEP, DIS, NFLX]
+  energy_industrial: [XOM, CVX, JNJ, PFE, UNH]
+  # sector ETFs used by sector-momentum hypotheses
+  sector_etfs: [XLK, XLF, XLY, XLP, XLE, XLV, XLI, XLB, XLRE, XLU, XLC]
+
+data:
+  start: "2015-01-01"
+  end: "2025-12-31"
+  interval: "1d"
+  # live mode pulls OHLCV via yfinance into the parquet cache;
+  # synthetic mode generates a deterministic seeded market so the full
+  # pipeline runs offline with zero API keys (CI, tests, evals).
+  mode: "synthetic"   # one of: synthetic | live

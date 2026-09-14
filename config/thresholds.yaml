@@ -1,0 +1,20 @@
+# Thresholds / statistical gates for AlphaForge
+statistics:
+  bonferroni_alpha: 0.05
+  bh_fdr_q: 0.10
+  bootstrap_iters: 10000
+  bootstrap_seed: 42
+  min_events: 30          # below this a hypothesis is marked UNTESTABLE
+
+backtest:
+  cost_bps: 10.0          # round-trip transaction cost applied to each event return
+  train_end: "2022-12-31"
+  test_start: "2023-01-01"
+
+synthetic_market:
+  seed: 42
+  annual_drift: 0.05
+  annual_vol: 0.25
+  earnings_beat_drift_bps: 60   # planted post-earnings drift so tests can assert sign recovery
+  reversal_bounce_bps: 40
+  volume_shock_drift_bps: -30

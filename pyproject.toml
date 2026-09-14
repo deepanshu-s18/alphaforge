@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alphaforge"
+version = "0.1.0"
+description = "AlphaForge — autonomous anomaly discovery & validation agent with statistical rigor inside the agent loop"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
+    "pyarrow>=14.0",
+    "pydantic>=2.5",
+    "pyyaml>=6.0",
+    "matplotlib>=3.7",
+    "langgraph>=0.2",
+    "structlog>=23.0",
+]
+
+[project.optional-dependencies]
+live = ["yfinance>=0.2.40"]
+llm = ["anthropic>=0.40.0"]
+dev = ["pytest>=7.4", "pytest-cov", "ruff"]
+
+[project.scripts]
+alphaforge = "alphaforge.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
