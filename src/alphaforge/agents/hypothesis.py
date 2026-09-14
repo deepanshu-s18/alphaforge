@@ -25,6 +25,22 @@ TEMPLATES_PATH = Path(__file__).parent / "hypothesis_templates.yaml"
 # per-family test direction used by the validation gate: significant p-value
 # must ALSO match the expected sign to survive (falsification, not p-hacking)
 
+# lexical anchors linking seed-query language to template families
+FAMILY_KEYWORDS = {
+    "earnings_drift": ["earnings", "beat", "surprise", "post-earnings", "drift", "pead"],
+    "reversal": ["reversal", "bounce", "drop", "drawdown", "oversold"],
+    "vol_regime": ["volatility", "regime", "risk", "dispersion", "clustering"],
+    "sector_momentum": ["sector", "rotation", "momentum", "etf"],
+    "day_of_week": ["monday", "weekday", "seasonality", "friday", "day"],
+    "volume_shock": ["volume", "spike", "abnormal", "shock", "rebalancing"],
+}
+
+
+def _overlap(query: str, family: str) -> int:
+    """Count seed-query keyword hits for a family (deterministic relevance)."""
+    q = query.lower()
+    return sum(1 for kw in FAMILY_KEYWORDS.get(family, []) if kw in q)
+
 
 def load_templates(path: Path = TEMPLATES_PATH) -> list[dict]:
     with open(path) as f:
@@ -37,11 +53,24 @@ class HypothesisAgent:
         self.templates = load_templates(templates_path)
 
     def generate(self, seed_query: str, n_target: int = 8, seed: int = 42) -> list[Hypothesis]:
-        """Deterministically instantiate `n_target` validated hypotheses."""
-        rng = __import__("numpy").random.default_rng(seed)
+        """Deterministically instantiate `n_target` validated hypotheses.
+
+        The RNG stream is derived from (seed, seed_query): different research
+        seeds sample different parameterizations/scopes, so each eval task
+        tests a genuinely distinct hypothesis set. Same seed + same query
+        still reproduces byte-identical output.
+        """
+        query_key = sum(map(ord, seed_query)) % (2**31)
+        rng = __import__("numpy").random.default_rng(seed + query_key)
+        # simple lexical relevance: templates whose family/keywords match the
+        # seed query are ordered first (deterministic, no LLM required)
+        scored = sorted(
+            self.templates,
+            key=lambda t: (-_overlap(seed_query, t["family"]), self.templates.index(t)),
+        )
         raw = []
-        # round-robin families first (coverage), then seeded extras
-        for i, t in enumerate(itertools.cycle(self.templates)):
+        # round-robin ranked families first (coverage), then seeded extras
+        for i, t in enumerate(itertools.cycle(scored)):
             if len(raw) >= n_target:
                 break
             raw.append(self._instantiate(t, seed_query, i, rng))

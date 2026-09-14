@@ -78,6 +78,20 @@ class TestHypothesisAgent:
         b = HypothesisAgent().generate("sector rotation", seed=42)
         assert [h.model_dump() for h in a] == [h.model_dump() for h in b]
 
+    def test_seed_query_influences_hypotheses(self):
+        """Different research seeds must test different hypothesis sets."""
+        a = HypothesisAgent().generate("post-earnings drift in megacap tech", seed=42)
+        b = HypothesisAgent().generate("volume spikes and next-week underperformance", seed=42)
+        sig_a = {(h.family, tuple(h.instrument_scope), str(sorted(h.event_def.items())))
+                 for h in a}
+        sig_b = {(h.family, tuple(h.instrument_scope), str(sorted(h.event_def.items())))
+                 for h in b}
+        assert sig_a != sig_b
+
+    def test_relevant_family_ranked_first(self):
+        hyps = HypothesisAgent().generate("Monday seasonality in large-cap equities", seed=42)
+        assert hyps[0].family == "day_of_week"
+
     def test_families_covered(self):
         hyps = HypothesisAgent().generate("any", n_target=8, seed=7)
         assert {h.family for h in hyps} >= {"earnings_drift", "reversal", "volume_shock"}
