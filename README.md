@@ -5,6 +5,15 @@ statistically tests every idea with multiple-testing correction, backtests
 survivors out-of-sample, and writes an honest report — including honest null
 results.**
 
+## Demo
+
+![AlphaForge run animation](demo.gif)
+
+*Animation of a real run (`python scripts/make_demo_gif.py`): the surviving
+signals' event-equity curves and return histograms build up over the test
+period, with the out-of-sample test Sharpe in the panel title. For a terminal
+walkthrough, `demo.tape` renders via [vhs](https://github.com/charmbracelets/vhs).*
+
 ```
 seed query ──▶ hypothesis ──▶ data ──▶ validation ──▶ [HITL checkpoint] ──▶ backtest ──▶ report
               agent          agent     agent                                  agent       agent
