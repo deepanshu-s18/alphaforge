@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
+
 from alphaforge.agents.base import RunContext, with_retries
 from alphaforge.agents.data import DataAgent
 from alphaforge.agents.hypothesis import HypothesisAgent
 from alphaforge.agents.validation import ValidationAgent
 from alphaforge.orchestrator.graph import Orchestrator
 from alphaforge.state.schema import AgentConfig, Hypothesis, ResearchState
-from pydantic import ValidationError
 
 
 class TestSchemaValidation:

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
+
 from alphaforge.mcp_servers.backtest.server import run_event_backtest
 from alphaforge.mcp_servers.market_data.server import generate_synthetic_market
 from alphaforge.state.schema import BacktestRequest, SignalSpec

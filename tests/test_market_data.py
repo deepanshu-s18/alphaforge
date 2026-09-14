@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
+
 from alphaforge.mcp_servers.market_data import server as md
 from alphaforge.utils.cache import make_key
 
@@ -15,6 +16,7 @@ START, END = "2015-01-01", "2025-12-31"
 def market(tmp_path_factory):
     m = md.MarketData.__new__(md.MarketData)
     import yaml
+
     from alphaforge.utils.config import DEFAULT_UNIVERSE, all_tickers
 
     m.universe_cfg = yaml.safe_load(open(DEFAULT_UNIVERSE))

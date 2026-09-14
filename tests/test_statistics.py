@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from alphaforge.mcp_servers.statistics import server as st
 from scipy import stats
+
+from alphaforge.mcp_servers.statistics import server as st
 
 
 class TestTTest:
