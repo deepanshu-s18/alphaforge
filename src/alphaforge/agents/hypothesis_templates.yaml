@@ -1,0 +1,58 @@
+# Seeded hypothesis templates — the hypothesis agent instantiates these with
+# (scope, thresholds, windows) sampled from a seeded RNG, then dedupes.
+# Every hypothesis must map to: event_def (with window_days), test_type, instrument_scope.
+
+templates:
+  - family: earnings_drift
+    statement: "Stocks that beat earnings expectations (surprise > {surprise_threshold}%) show {direction} drift over the next {window_days} sessions."
+    test_type: one_sample_ttest
+    expected_effect: positive
+    scopes: [megacap_tech, financials, consumer, energy_industrial]
+    params:
+      surprise_threshold: [1.0, 2.0, 4.0]
+      window_days: [5, 10, 15]
+
+  - family: reversal
+    statement: "Stocks whose 5-day return falls in the bottom {pct_cut} of their own distribution outperform over the next {window_days} sessions."
+    test_type: two_sample_ttest
+    expected_effect: positive
+    scopes: [megacap_tech, financials, consumer]
+    params:
+      pct_cut: [0.05, 0.10, 0.20]
+      window_days: [5, 10]
+
+  - family: vol_regime
+    statement: "When realized volatility over {vol_window} sessions is above its {pct_cut} percentile, next-week returns are {direction}."
+    test_type: two_sample_ttest
+    expected_effect: negative
+    scopes: [megacap_tech, energy_industrial, sector_etfs]
+    params:
+      vol_window: [21]
+      pct_cut: [0.80, 0.90]
+      window_days: [5]
+
+  - family: sector_momentum
+    statement: "Sector ETFs with positive {lookback_days}-session momentum continue to outperform over the next {window_days} sessions."
+    test_type: two_sample_ttest
+    expected_effect: positive
+    scopes: [sector_etfs]
+    params:
+      lookback_days: [21, 63]
+      window_days: [21]
+
+  - family: day_of_week
+    statement: "Monday returns are {direction} than Friday returns for {scope_name} constituents."
+    test_type: two_sample_ttest
+    expected_effect: negative
+    scopes: [megacap_tech, financials, consumer]
+    params:
+      window_days: [1]
+
+  - family: volume_shock
+    statement: "Stocks with a volume spike above {zscore} standard deviations underperform over the next {window_days} sessions."
+    test_type: two_sample_ttest
+    expected_effect: negative
+    scopes: [megacap_tech, financials]
+    params:
+      zscore: [2.0, 2.5]
+      window_days: [5]
