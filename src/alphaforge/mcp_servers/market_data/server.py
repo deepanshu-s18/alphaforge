@@ -159,12 +159,16 @@ def _inject_drift(rets: np.ndarray, event_positions: np.ndarray, horizon: int, p
 
 
 class MarketData:
-    def __init__(self, universe_path=DEFAULT_UNIVERSE, thresholds_path=DEFAULT_THRESHOLDS):
+    def __init__(self, universe_path=DEFAULT_UNIVERSE, thresholds_path=DEFAULT_THRESHOLDS,
+                 mode: str | None = None):
         self.universe_cfg = load_universe(universe_path)
         self.tickers = all_tickers(self.universe_cfg)
         self.groups = self.universe_cfg["universe"]
         d = self.universe_cfg["data"]
-        self.start, self.end, self.mode = d["start"], d["end"], d.get("mode", "synthetic")
+        self.start, self.end = d["start"], d["end"]
+        # explicit mode overrides config file; cache key includes it so
+        # synthetic and live datasets can never collide
+        self.mode = mode or d.get("mode", "synthetic")
         self.synth_cfg = synthetic_market_cfg(thresholds_path)
         self.cache = ParquetCache()
         self._rate_last = 0.0
@@ -197,7 +201,9 @@ class MarketData:
 
     # -- internals ----------------------------------------------------------
     def _dataset(self, kind: str, ticker: str) -> pd.DataFrame:
-        key = make_key(f"{kind}_{ticker}", self.start, self.end, "1d")
+        # mode in the key: synthetic and live versions of the same ticker/range
+        # must never collide in the cache
+        key = make_key(f"{kind}_{self.mode}_{ticker}", self.start, self.end, "1d")
         cached = self.cache.get(key)
         if cached is not None:
             return cached
@@ -253,12 +259,17 @@ class MarketData:
         ed = yf.Ticker(ticker).earnings_dates
         if ed is None or ed.empty:
             return pd.DataFrame(columns=EARNINGS_COLUMNS)
-        ed = ed.reset_index().rename(columns={"index": "date"})
-        out = pd.DataFrame({"date": pd.to_datetime(ed["date"]).dt.tz_localize(None)})
-        out["ticker"] = ticker
-        out["surprise_pct"] = ed.get("Surprise(%)", np.nan).astype(float)
+        # earnings_dates: DatetimeIndex (tz-aware) named "Earnings Date",
+        # columns EPS Estimate / Reported EPS / Surprise(%)
+        out = pd.DataFrame({
+            "ticker": ticker,
+            "date": pd.to_datetime(ed.index).tz_localize(None).normalize(),
+        })
+        surprise = ed["Surprise(%)"] if "Surprise(%)" in ed.columns else np.nan
+        out["surprise_pct"] = pd.Series(surprise).to_numpy()[: len(out)]
         out["bmo_amc"] = "unknown"
-        return out.dropna(subset=["surprise_pct"])
+        out = out.dropna(subset=["surprise_pct"])
+        return out[["ticker", "date", "surprise_pct", "bmo_amc"]]
 
 
 def build_server():  # pragma: no cover - requires mcp package

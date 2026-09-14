@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+import alphaforge.mcp_servers.market_data.server as md_mod
 from alphaforge.mcp_servers.market_data import server as md
 from alphaforge.utils.cache import make_key
 
@@ -107,3 +108,42 @@ class TestMarketDataTools:
         pq.write_bytes(pq.read_bytes()[:-5] + b"xxxxx")  # flip bytes
         with pytest.raises(IOError, match="checksum"):
             cache.get("k")
+
+
+class TestLiveEarningsParser:
+    """Regression: yfinance earnings_dates has a tz-aware DatetimeIndex named
+    'Earnings Date' and a 'Surprise(%)' column — not a 'date' column."""
+
+    def test_parses_index_and_drops_nan_surprise(self):
+        from unittest.mock import patch
+
+        import numpy as np
+
+        md = md_mod.MarketData.__new__(md_mod.MarketData)
+        md._rate_last = 0.0
+        fake = pd.DataFrame(
+            {"EPS Estimate": [1.98, 1.89], "Reported EPS": [np.nan, 2.02],
+             "Surprise(%)": [np.nan, 6.74]},
+            index=pd.DatetimeIndex(
+                [pd.Timestamp("2026-10-29 16:00:00-04:00"),
+                 pd.Timestamp("2026-07-30 16:00:00-04:00")],
+                name="Earnings Date",
+            ),
+        )
+        with patch("yfinance.Ticker") as T:
+            T.return_value.earnings_dates = fake
+            out = md._fetch_live_earnings("AAPL")
+        assert list(out.columns) == ["ticker", "date", "surprise_pct", "bmo_amc"]
+        assert len(out) == 1
+        assert out.iloc[0]["date"] == pd.Timestamp("2026-07-30")
+        assert out.iloc[0]["surprise_pct"] == 6.74
+
+    def test_empty_calendar(self):
+        from unittest.mock import patch
+
+        md = md_mod.MarketData.__new__(md_mod.MarketData)
+        md._rate_last = 0.0
+        with patch("yfinance.Ticker") as T:
+            T.return_value.earnings_dates = pd.DataFrame()
+            out = md._fetch_live_earnings("AAPL")
+        assert out.empty

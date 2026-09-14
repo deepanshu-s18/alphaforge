@@ -20,7 +20,8 @@ from alphaforge.agents.data import DataAgent
 from alphaforge.agents.hypothesis import HypothesisAgent
 from alphaforge.agents.report import ReportAgent
 from alphaforge.agents.validation import ValidationAgent
-from alphaforge.state.schema import ResearchState
+from alphaforge.mcp_servers.market_data.server import MarketData
+from alphaforge.state.schema import AgentConfig, ResearchState
 from alphaforge.utils.logging import get_logger
 
 log = get_logger("alphaforge.orchestrator")
@@ -29,9 +30,10 @@ StateDict = dict[str, Any]
 
 
 class Orchestrator:
-    def __init__(self, llm_backend: str | None = None):
+    def __init__(self, llm_backend: str | None = None, data_mode: str | None = None):
+        # data_mode ("live"/"synthetic") propagates into the market-data tool
         self.hypothesis_agent = HypothesisAgent()
-        self.data_agent = DataAgent()
+        self.data_agent = DataAgent(market_data=MarketData(mode=data_mode))
         self.validation_agent = ValidationAgent()
         self.backtest_agent = BacktestAgent()
         self.report_agent = ReportAgent()
@@ -127,9 +129,9 @@ class Orchestrator:
 
     def run(self, seed_query: str, config: dict | None = None,
             out_dir: str = "reports") -> ResearchState:
-        from alphaforge.state.schema import AgentConfig
-
         cfg = AgentConfig(**(config or {}))
+        # data_mode flows from the caller's AgentConfig into the market-data tool
+        self.data_agent = DataAgent(market_data=MarketData(mode=cfg.data_mode))
         ctx = RunContext(config=cfg)
         graph = self.build_graph()
         final: StateDict = graph.invoke(
