@@ -1,0 +1,20 @@
+{"id": 1, "seed": "post-earnings drift in megacap tech", "min_hypotheses": 5}
+{"id": 2, "seed": "sector rotation momentum among sector ETFs", "min_hypotheses": 5}
+{"id": 3, "seed": "short-term reversal after sharp drops", "min_hypotheses": 5}
+{"id": 4, "seed": "volume spikes and next-week underperformance", "min_hypotheses": 5}
+{"id": 5, "seed": "high volatility regimes and next-week returns", "min_hypotheses": 5}
+{"id": 6, "seed": "Monday seasonality in large-cap equities", "min_hypotheses": 5}
+{"id": 7, "seed": "earnings surprises in financials", "min_hypotheses": 5}
+{"id": 8, "seed": "reversal in consumer staples and discretionary", "min_hypotheses": 5}
+{"id": 9, "seed": "momentum persistence in energy equities", "min_hypotheses": 5}
+{"id": 10, "seed": "volume shocks around earnings windows", "min_hypotheses": 5}
+{"id": 11, "seed": "volatility clustering in sector ETFs", "min_hypotheses": 5}
+{"id": 12, "seed": "weekday effects in tech constituents", "min_hypotheses": 5}
+{"id": 13, "seed": "drift after large positive earnings surprises", "min_hypotheses": 5}
+{"id": 14, "seed": "deep drawdown bouncebacks in megacaps", "min_hypotheses": 5}
+{"id": 15, "seed": "abnormal volume and institutional rebalancing", "min_hypotheses": 5}
+{"id": 16, "seed": "risk-off regimes and defensive sector returns", "min_hypotheses": 5}
+{"id": 17, "seed": "post-earnings drift in healthcare names", "min_hypotheses": 5}
+{"id": 18, "seed": "quiet-period drift before earnings", "min_hypotheses": 5}
+{"id": 19, "seed": "cross-sectional dispersion after vol spikes", "min_hypotheses": 5}
+{"id": 20, "seed": "persistently high volume and trend continuation", "min_hypotheses": 5}
