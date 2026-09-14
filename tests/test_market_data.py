@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
@@ -20,7 +22,7 @@ def market(tmp_path_factory):
 
     from alphaforge.utils.config import DEFAULT_UNIVERSE, all_tickers
 
-    m.universe_cfg = yaml.safe_load(open(DEFAULT_UNIVERSE))
+    m.universe_cfg = yaml.safe_load(Path(DEFAULT_UNIVERSE).read_text())
     m.tickers = all_tickers(m.universe_cfg)
     m.groups = m.universe_cfg["universe"]
     m.start, m.end, m.mode = START, END, "synthetic"

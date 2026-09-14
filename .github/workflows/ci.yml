@@ -24,3 +24,13 @@ jobs:
         run: ruff check src tests evals
       - name: Tests
         run: pytest -q --tb=short
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t alphaforge:${{ github.sha }} .
+      - name: Smoke-run image (headless synthetic pipeline)
+        run: |
+          docker run --rm alphaforge:${{ github.sha }} "post-earnings drift in megacap tech"

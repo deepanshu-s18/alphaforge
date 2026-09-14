@@ -15,23 +15,46 @@ from alphaforge.events.builders import build_events
 from alphaforge.state.schema import BacktestRequest
 
 
-def _split_metrics(rets: np.ndarray, dates: pd.Series, cost_bps: float) -> dict:
+def _split_metrics(rets: np.ndarray, dates: pd.Series, cost_bps: float,
+                    eval_years: float, holding_days: int) -> dict:
+    """Metrics for one split.
+
+    Sharpe is annualized by the EVALUATION period (e.g. 3 test years), not
+    the event-date span — annualizing by a few days of events would inflate
+    the scaling factor absurdly. n_independent counts non-overlapping event
+    windows (events >= holding_days apart), the honest sample size for
+    overlapping event studies.
+    """
     rets = np.asarray(rets, dtype=float)
     net = rets - cost_bps / 10_000.0  # round-trip cost per event
     n = len(net)
     if n < 2:
-        return {"n_events": int(n), "mean_ret_bps": 0.0, "sharpe": 0.0,
-                "max_drawdown": 0.0, "win_rate": 0.0}
-    mean, std = net.mean(), net.std(ddof=1)
-    years = max((dates.max() - dates.min()).days / 365.25, 1 / 12.0)
-    events_per_year = n / years
-    sharpe = (mean / std) * np.sqrt(events_per_year) if std > 0 else 0.0
+        return {"n_events": int(n), "n_independent": int(n), "mean_ret_bps": 0.0,
+                "sharpe": 0.0, "max_drawdown": 0.0, "win_rate": 0.0}
+
+    dates = pd.to_datetime(dates)
     order = np.argsort(dates.to_numpy())
-    eq = np.cumprod(1.0 + net[order])
+    net = net[order]
+    dates_sorted = pd.Series(dates.to_numpy()[order]).reset_index(drop=True)
+
+    mean, std = net.mean(), net.std(ddof=1)
+    # honest annualization: n events spread over the full eval window
+    # (3 events in a 3-year test = 1/yr), NOT the event-date span
+    sharpe = (mean / std) * np.sqrt(n / eval_years) if std > 0 else 0.0
+
+    # independent events: first event, then each >= holding_days later
+    n_indep, last = 0, None
+    for d in dates_sorted:
+        if last is None or (d - last).days >= holding_days:
+            n_indep += 1
+            last = d
+
+    eq = np.cumprod(1.0 + net)
     peak = np.maximum.accumulate(eq)
     max_dd = float(((eq - peak) / peak).min())
     return {
         "n_events": int(n),
+        "n_independent": int(n_indep),
         "mean_ret_bps": float(mean * 10_000),
         "sharpe": float(sharpe),
         "max_drawdown": max_dd,
@@ -63,8 +86,17 @@ def run_event_backtest(request: BacktestRequest, ohlcv: pd.DataFrame,
     train = ev[ev["date"] <= pd.Timestamp(request.train_end)]
     test = ev[ev["date"] >= pd.Timestamp(request.test_start)]
 
-    tr = _split_metrics(train["_ret"].to_numpy(), train["date"], request.cost_bps)
-    te = _split_metrics(test["_ret"].to_numpy(), test["date"], request.cost_bps)
+    # evaluation periods: full train window / full test window (from data
+    # span), so Sharpe annualization never depends on when events happened
+    data_start = pd.Timestamp(ohlcv["date"].min()) if len(ohlcv) else test["date"].min()
+    train_years = max((pd.Timestamp(request.train_end) - data_start).days / 365.25,
+                      1 / 12)
+    test_years = max((ev["date"].max() - pd.Timestamp(request.test_start)).days / 365.25,
+                     1 / 12)
+    tr = _split_metrics(train["_ret"].to_numpy(), train["date"], request.cost_bps,
+                        train_years, s.holding_days)
+    te = _split_metrics(test["_ret"].to_numpy(), test["date"], request.cost_bps,
+                        test_years, s.holding_days)
     return {
         "signal_id": s.signal_id,
         "hypothesis_id": s.hypothesis_id,

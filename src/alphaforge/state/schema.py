@@ -95,6 +95,8 @@ class BacktestResult(BaseModel):
     test_max_drawdown: float
     test_win_rate: float
     n_train_events: int
+    n_train_independent: int = 0
+    n_test_independent: int = 0
     n_test_events: int
     cost_bps: float
     notes: str = ""

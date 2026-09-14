@@ -64,6 +64,8 @@ class BacktestAgent:
                     test_win_rate=round(te.get("win_rate", 0.0), 4),
                     n_train_events=tr.get("n_events", 0),
                     n_test_events=te.get("n_events", 0),
+                    n_train_independent=tr.get("n_independent", 0),
+                    n_test_independent=te.get("n_independent", 0),
                     cost_bps=cfg.cost_bps,
                 ))
                 h.status = "backtested"

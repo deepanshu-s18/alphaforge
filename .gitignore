@@ -22,3 +22,6 @@ htmlcov/
 
 # OS
 .DS_Store
+
+# live-mode run outputs (same policy as reports/)
+reports_live/

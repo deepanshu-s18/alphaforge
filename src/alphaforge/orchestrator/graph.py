@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 from langgraph.graph import END, StateGraph
+from langgraph.types import Command
 
 from alphaforge.agents.backtest import BacktestAgent
 from alphaforge.agents.base import RunContext
@@ -41,7 +42,7 @@ class Orchestrator:
     # -- node wrappers (Pydantic model <-> dict for langgraph) --------------
     def _node_hypothesis(self, state: StateDict) -> StateDict:
         rs = ResearchState(**state)
-        ctx: RunContext = state["_ctx"]
+        ctx: RunContext = self._active_ctx
         try:
             rs.hypotheses = self.hypothesis_agent.generate(
                 rs.seed_query, n_target=8, seed=rs.config.seed
@@ -57,14 +58,14 @@ class Orchestrator:
     def _node_data(self, state: StateDict) -> StateDict:
         rs = ResearchState(**state)
         rs.config = _cfg_from(state)
-        ctx: RunContext = state["_ctx"]
+        ctx: RunContext = self._active_ctx
         rs = self.data_agent.run(rs, ctx)
         return {**state, **rs.model_dump()}
 
     def _node_validation(self, state: StateDict) -> StateDict:
         rs = ResearchState(**state)
         rs.config = _cfg_from(state)
-        ctx: RunContext = state["_ctx"]
+        ctx: RunContext = self._active_ctx
         rs = self.validation_agent.run(rs, ctx)
         return {**state, **rs.model_dump()}
 
@@ -77,19 +78,21 @@ class Orchestrator:
         )
         state = {**state, "survivors_count": len(rs.surviving_signals)}
         if not rs.config.hitl_approve:
+            # interrupts the graph (requires checkpointer, see run_interactive);
+            # resumes with "approve"/"reject" via Command(resume=...)
             from langgraph.types import interrupt
 
             decision = interrupt(
                 f"{len(rs.surviving_signals)} signals passed validation. "
                 f"Approve backtesting? [approve/reject]"
             )
-            state["hitl_decision"] = decision
+            state["hitl_decision"] = str(decision).lower()
         return {**state, "hitl_decision": state.get("hitl_decision", "approve")}
 
     def _node_backtest(self, state: StateDict) -> StateDict:
         rs = ResearchState(**state)
         rs.config = _cfg_from(state)
-        ctx: RunContext = state["_ctx"]
+        ctx: RunContext = self._active_ctx
         if state.get("hitl_decision") == "reject":
             log.info("hitl_rejected", skipped=len(rs.surviving_signals))
             return state
@@ -99,12 +102,12 @@ class Orchestrator:
     def _node_report(self, state: StateDict) -> StateDict:
         rs = ResearchState(**state)
         rs.config = _cfg_from(state)
-        ctx: RunContext = state["_ctx"]
+        ctx: RunContext = self._active_ctx
         rs = self.report_agent.run(rs, ctx, out_dir=state.get("out_dir", "reports"))
         return {**state, **rs.model_dump()}
 
     # -- graph ---------------------------------------------------------------
-    def build_graph(self):
+    def build_graph(self, checkpointer=None):
         g = StateGraph(StateDict)
         g.add_node("hypothesis", self._node_hypothesis)
         g.add_node("data", self._node_data)
@@ -125,24 +128,68 @@ class Orchestrator:
         )
         g.add_edge("backtest", "report")
         g.add_edge("report", END)
-        return g.compile()
+        return g.compile(checkpointer=checkpointer)
 
     def run(self, seed_query: str, config: dict | None = None,
             out_dir: str = "reports") -> ResearchState:
+        """Run the pipeline. Auto-approves HITL when config.hitl_approve=True.
+
+        Interactive runs must go through run_interactive(): langgraph's
+        interrupt() only pauses a graph that has a checkpointer, so silently
+        calling run() with hitl_approve=False would complete WITHOUT waiting
+        for a human — a silent auto-approve we refuse to do.
+        """
         cfg = AgentConfig(**(config or {}))
+        if not cfg.hitl_approve:
+            raise ValueError(
+                "hitl_approve=False requires run_interactive(); plain run() "
+                "would silently auto-approve the checkpoint"
+            )
         # data_mode flows from the caller's AgentConfig into the market-data tool
         self.data_agent = DataAgent(market_data=MarketData(mode=cfg.data_mode))
-        ctx = RunContext(config=cfg)
+        self._active_ctx = RunContext(config=cfg)
         graph = self.build_graph()
         final: StateDict = graph.invoke(
             {
                 "seed_query": seed_query,
                 "config": cfg.model_dump(mode="json"),
                 "out_dir": out_dir,
-                "_ctx": ctx,
             },
             config={"recursion_limit": 50},
         )
+        if "__interrupt__" in final:  # defensive: should not happen on this path
+            raise RuntimeError("unexpected interrupt in auto-approve run")
+        return ResearchState(**{k: v for k, v in final.items() if not k.startswith("_")})
+
+    def run_interactive(self, seed_query: str, config: dict | None = None,
+                        out_dir: str = "reports",
+                        prompt=input) -> ResearchState:
+        """Run with a REAL human-in-the-loop checkpoint.
+
+        Uses a MemorySaver checkpointer so interrupt() genuinely pauses the
+        graph; `prompt` (injectable for tests) asks the human approve/reject
+        and the graph resumes with their decision.
+        """
+        from langgraph.checkpoint.memory import MemorySaver
+
+        cfg = AgentConfig(**{**(config or {}), "hitl_approve": False})
+        self.data_agent = DataAgent(market_data=MarketData(mode=cfg.data_mode))
+        self._active_ctx = RunContext(config=cfg)
+        graph = self.build_graph(checkpointer=MemorySaver())
+        thread = {"configurable": {"thread_id": f"hitl-{abs(hash(seed_query))}"}}
+        state_in = {
+            "seed_query": seed_query,
+            "config": cfg.model_dump(mode="json"),
+            "out_dir": out_dir,
+        }
+        final = graph.invoke(state_in, config={**thread, "recursion_limit": 50})
+        while "__interrupt__" in final:
+            answer = prompt(str(final["__interrupt__"][0].value) + " ")
+            decision = "reject" if str(answer).strip().lower().startswith("r") else "approve"
+            final = graph.invoke(
+                Command(resume=decision),
+                config={**thread, "recursion_limit": 50},
+            )
         return ResearchState(**{k: v for k, v in final.items() if not k.startswith("_")})
 
 

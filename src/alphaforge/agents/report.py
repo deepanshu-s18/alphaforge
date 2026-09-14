@@ -102,7 +102,7 @@ class ReportAgent:
             f"Bonferroni/BH-FDR correction AND the expected-sign check.",
             "",
             "| Signal | Hypothesis | Family | Test Sharpe | Test mean (bps) "
-            "| Max DD | Win rate | n (train/test) |",
+            "| Max DD | Win rate | n indep (train/test) |",
             "|---|---|---|---|---|---|---|---|",
         ]
         bt_by_id = {b.hypothesis_id: b for b in state.backtest_results}
@@ -113,7 +113,8 @@ class ReportAgent:
                 lines.append(
                     f"| {sig.signal_id} | {sig.hypothesis_id} | {h.family} | "
                     f"{b.test_sharpe} | {b.test_mean_ret_bps} | {b.test_max_drawdown:.1%} | "
-                    f"{b.test_win_rate:.1%} | {b.n_train_events}/{b.n_test_events} |"
+                    f"{b.test_win_rate:.1%} | {b.n_train_independent}/"
+                    f"{b.n_test_independent} (of {b.n_train_events}/{b.n_test_events}) |"
                 )
             else:
                 lines.append(

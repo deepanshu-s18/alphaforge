@@ -18,6 +18,7 @@ import time as _time
 import numpy as np
 import pandas as pd
 
+from alphaforge.state.schema import frame_to_records
 from alphaforge.utils.cache import ParquetCache, make_key
 from alphaforge.utils.config import (
     DEFAULT_THRESHOLDS,
@@ -281,12 +282,12 @@ def build_server():  # pragma: no cover - requires mcp package
     @mcp.tool()
     def get_ohlcv(ticker: str, start: str, end: str) -> list[dict]:
         """Daily OHLCV bars for one ticker in the research universe."""
-        return md.get_ohlcv([ticker], start, end).to_dict(orient="records")
+        return frame_to_records(md.get_ohlcv([ticker], start, end))
 
     @mcp.tool()
     def get_earnings_calendar(ticker: str, start: str, end: str) -> list[dict]:
         """Earnings event dates with surprise percent for one ticker."""
-        return md.get_earnings_calendar([ticker], start, end).to_dict(orient="records")
+        return frame_to_records(md.get_earnings_calendar([ticker], start, end))
 
     @mcp.tool()
     def list_universe() -> dict:

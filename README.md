@@ -97,7 +97,8 @@ export ANTHROPIC_API_KEY=sk-...
 alphaforge "sector rotation momentum" --mode live --llm claude
 ```
 
-Interactive human-in-the-loop checkpoint (approve/reject before backtesting):
+Interactive human-in-the-loop checkpoint — genuinely pauses the graph
+(checkpointer-backed interrupt/resume) and waits for approve/reject:
 
 ```bash
 alphaforge "volume shocks" --interactive
@@ -160,8 +161,14 @@ history reflects the incremental build.
 ## Limitations
 
 - Synthetic-mode results validate the pipeline, not real alpha. Run `--mode live`.
-- Event-study Sharpe uses events-per-year scaling; no overlapping-capital model.
+- Event-study Sharpe annualizes by events-per-year over the **evaluation window**
+  and reports `n_independent` (non-overlapping event windows) alongside raw
+  counts — overlapping events still share return windows, so raw-count Sharpe
+  overstates effective sample size. No overlapping-position capital model.
 - Flat cost model (bps round-trip); no market impact or slippage curve.
+- Live earnings data (yfinance) reaches back only ~4 years, so earnings-driven
+  hypotheses have thin train-split samples in live mode; results reflect the
+  real, thinner sample rather than hiding it.
 - BH/Bonferroni protect within a run; cross-run specification search still
   inflates discovery risk — the OOS split is the primary defense.
 

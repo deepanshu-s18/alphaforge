@@ -34,7 +34,14 @@ def main(argv: list[str] | None = None) -> int:
         hitl_approve=not args.interactive,
     )
     orch = Orchestrator()
-    state = orch.run(args.seed_query, config=cfg.model_dump(mode="json"), out_dir=args.out)
+    if args.interactive:
+        # real interrupt/resume loop with a checkpointer-backed graph
+        state = orch.run_interactive(args.seed_query,
+                                     config=cfg.model_dump(mode="json"),
+                                     out_dir=args.out)
+    else:
+        state = orch.run(args.seed_query, config=cfg.model_dump(mode="json"),
+                         out_dir=args.out)
     metrics = state.to_metrics()
     log.info("run_complete", **metrics)
     print(json.dumps(metrics, indent=2))

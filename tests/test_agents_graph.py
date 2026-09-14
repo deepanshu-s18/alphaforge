@@ -188,7 +188,8 @@ class TestGraph:
         )
         assert rs.surviving_signals == []
         assert rs.report_path is not None
-        text = open(rs.report_path).read()
+        with open(rs.report_path) as f:
+            text = f.read()
         assert "Null result" in text
 
     def test_metrics_shape(self, tmp_path):
@@ -203,3 +204,46 @@ class TestGraph:
             assert key in m
         assert m["cost_usd"] == 0.0  # template mode: zero API cost
         assert m["llm_calls"] == 0
+
+
+class TestHITL:
+    """Regression: langgraph interrupt() without a checkpointer silently
+    completes (auto-approves). Interactive runs must use run_interactive()."""
+
+    def test_run_refuses_silent_auto_approve(self):
+        from alphaforge.state.schema import AgentConfig
+
+        with pytest.raises(ValueError, match="run_interactive"):
+            Orchestrator().run(
+                "q", config=AgentConfig(hitl_approve=False).model_dump(mode="json"),
+                out_dir="/tmp/never",
+            )
+
+    def test_interactive_reject_skips_backtest(self, tmp_path):
+        rs = Orchestrator().run_interactive(
+            "post-earnings drift in megacap tech",
+            out_dir=str(tmp_path / "reports"),
+            prompt=lambda q: "reject",
+        )
+        assert rs.surviving_signals, "sanity: signals existed to approve/reject"
+        assert rs.backtest_results == [], "reject must skip backtesting"
+        assert rs.report_path is not None
+
+    def test_interactive_approve_backtests(self, tmp_path):
+        rs = Orchestrator().run_interactive(
+            "post-earnings drift in megacap tech",
+            out_dir=str(tmp_path / "reports"),
+            prompt=lambda q: "approve",
+        )
+        assert len(rs.backtest_results) == len(rs.surviving_signals)
+
+    def test_interactive_prompt_actually_called(self, tmp_path):
+        """The checkpoint must genuinely pause and ask a human."""
+        asked = []
+        Orchestrator().run_interactive(
+            "post-earnings drift in megacap tech",
+            out_dir=str(tmp_path / "reports"),
+            prompt=lambda q: asked.append(q) or "approve",
+        )
+        assert asked, "run_interactive completed without asking the human"
+        assert "signals passed validation" in asked[0]
