@@ -1,0 +1,232 @@
+{
+  "n_tasks": 20,
+  "task_completion_rate": 1.0,
+  "schema_validity_rate": 1.0,
+  "hallucination_count": 0,
+  "null_result_rate": 0.0,
+  "avg_cost_usd": 0.0,
+  "avg_llm_calls": 0.0,
+  "avg_wall_s": 87.15,
+  "rows": [
+    {
+      "id": 1,
+      "seed": "post-earnings drift in megacap tech",
+      "completed": true,
+      "n_hypotheses": 7,
+      "n_tested": 7,
+      "n_survivors": 4,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 41.71
+    },
+    {
+      "id": 2,
+      "seed": "sector rotation momentum among sector ETFs",
+      "completed": true,
+      "n_hypotheses": 7,
+      "n_tested": 7,
+      "n_survivors": 4,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 26.43
+    },
+    {
+      "id": 3,
+      "seed": "short-term reversal after sharp drops",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 5,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 400.34
+    },
+    {
+      "id": 4,
+      "seed": "volume spikes and next-week underperformance",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 5,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 411.79
+    },
+    {
+      "id": 5,
+      "seed": "high volatility regimes and next-week returns",
+      "completed": true,
+      "n_hypotheses": 7,
+      "n_tested": 7,
+      "n_survivors": 4,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 35.38
+    },
+    {
+      "id": 6,
+      "seed": "Monday seasonality in large-cap equities",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 4,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 51.8
+    },
+    {
+      "id": 7,
+      "seed": "earnings surprises in financials",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 5,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 62.82
+    },
+    {
+      "id": 8,
+      "seed": "reversal in consumer staples and discretionary",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 5,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 27.66
+    },
+    {
+      "id": 9,
+      "seed": "momentum persistence in energy equities",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 4,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 46.29
+    },
+    {
+      "id": 10,
+      "seed": "volume shocks around earnings windows",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 5,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 48.93
+    },
+    {
+      "id": 11,
+      "seed": "volatility clustering in sector ETFs",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 3,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 33.28
+    },
+    {
+      "id": 12,
+      "seed": "weekday effects in tech constituents",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 4,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 43.63
+    },
+    {
+      "id": 13,
+      "seed": "drift after large positive earnings surprises",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 5,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 89.55
+    },
+    {
+      "id": 14,
+      "seed": "deep drawdown bouncebacks in megacaps",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 5,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 38.47
+    },
+    {
+      "id": 15,
+      "seed": "abnormal volume and institutional rebalancing",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 5,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 60.07
+    },
+    {
+      "id": 16,
+      "seed": "risk-off regimes and defensive sector returns",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 3,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 37.48
+    },
+    {
+      "id": 17,
+      "seed": "post-earnings drift in healthcare names",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 5,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 90.1
+    },
+    {
+      "id": 18,
+      "seed": "quiet-period drift before earnings",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 5,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 42.75
+    },
+    {
+      "id": 19,
+      "seed": "cross-sectional dispersion after vol spikes",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 4,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 52.45
+    },
+    {
+      "id": 20,
+      "seed": "persistently high volume and trend continuation",
+      "completed": true,
+      "n_hypotheses": 8,
+      "n_tested": 8,
+      "n_survivors": 5,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 102.02
+    }
+  ]
+}
