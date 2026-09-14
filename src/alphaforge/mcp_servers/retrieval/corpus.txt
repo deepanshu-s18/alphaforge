@@ -1,0 +1,54 @@
+# AlphaForge grounding corpus — small curated snippets used by mcp-retrieval
+# to ground the discussion section of research reports. Replace/extend with
+# EDGAR filings text or earnings-call transcripts for live use.
+
+Post-earnings announcement drift (PEAD) is the empirical observation that stock
+prices continue to move in the direction of an earnings surprise for several
+weeks after the announcement. Ball and Brown (1968) first documented the effect.
+Explanations include underreaction to new information and limited investor
+attention. The drift is strongest for high-surprise stocks and weakens after
+public disclosure of the anomaly.
+
+Short-term reversal refers to the tendency of stocks with extreme negative
+short-term returns to bounce back over the following days. Jegadeesh (1990)
+documented 1-month reversal in US equities. Liquidity provision by
+market-makers and temporary order-flow pressure are common explanations.
+
+Volatility regimes matter for expected returns: high realized volatility is
+associated with elevated risk premiums but also with poorer risk-adjusted
+returns for leveraged strategies. Persistence in volatility (volatility
+clustering, Engle 1982) makes percentile-based regime classification stable
+out of sample.
+
+Cross-sectional and time-series momentum: assets with strong past 3-12 month
+performance tend to continue outperforming over the next 1-12 months
+(Jegadeesh and Titman 1993). Momentum crashes can occur at market reversals,
+so risk management is essential when harvesting momentum.
+
+Volume shocks: abnormal trading volume often signals information arrival or
+institutional rebalancing. Stocks with extreme volume spikes tend to
+underperform over the following week, consistent with temporary price pressure
+and subsequent reversal (Llorente et al. 2002; Gabaix et al. 2006).
+
+Seasonalities: the Monday effect denotes historically lower average returns on
+Mondays relative to other weekdays, most notably Fridays. The effect has
+weakened since the 1990s but remains a standard sanity-check seasonality in
+event studies.
+
+Transaction costs: realistic round-trip costs for liquid US equities range
+from 5 to 15 basis points including slippage and fees. Any event-study
+backtest that ignores costs overstates strategy viability, especially for
+high-turnover event-driven signals.
+
+Multiple-testing discipline: when testing many hypotheses simultaneously, the
+expected number of false discoveries grows with the number of tests. The
+Bonferroni correction controls the family-wise error rate by testing each
+hypothesis at alpha/m; the Benjamini-Hochberg procedure controls the expected
+false discovery rate (FDR) at level q. Reporting both is standard practice in
+quantitative research.
+
+Human-in-the-loop review in agentic research systems: automated pipelines can
+propose and test hypotheses at scale, but checkpoint reviews before capital
+allocation are critical. A checkpoint after statistical validation and before
+backtesting lets a researcher reject technically significant but
+economically implausible signals.
