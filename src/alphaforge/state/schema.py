@@ -142,6 +142,8 @@ class ResearchState(BaseModel):
     errors: list[AgentError] = Field(default_factory=list)
     cost_usd: float = 0.0
     llm_calls: int = 0
+    tool_calls: int = 0
+    first_try_tool_rate: float = 0.0
 
     @property
     def survivors(self) -> list[TestResult]:
@@ -159,6 +161,8 @@ class ResearchState(BaseModel):
             "null_result": len(self.surviving_signals) == 0,
             "cost_usd": round(self.cost_usd, 4),
             "llm_calls": self.llm_calls,
+            "tool_calls": self.tool_calls,
+            "first_try_tool_rate": round(self.first_try_tool_rate, 4),
             "report_path": self.report_path,
         }
 

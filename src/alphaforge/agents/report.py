@@ -24,10 +24,11 @@ log = get_logger("alphaforge.report")
 
 
 class ReportAgent:
-    def __init__(self, retriever=None):
+    def __init__(self, retriever=None, llm_client=None):
         from alphaforge.mcp_servers.retrieval.server import default_retriever
 
         self.retriever = retriever or default_retriever()
+        self.llm_client = llm_client
 
     def run(self, state: ResearchState, ctx: RunContext,
             out_dir: str | Path = "reports") -> ResearchState:
@@ -180,6 +181,19 @@ class ReportAgent:
         lines = ["## Literature grounding (mcp-retrieval)", ""]
         for h in hits:
             lines.append(f"> {h['text']}\n> — *{h['source']}*\n")
+        # optional LLM discussion grounded in the retrieved context + results
+        if state.config.llm_backend == "claude" and getattr(self, "llm_client", None):
+            context = (
+                f"seed query: {state.seed_query}\n\n"
+                f"literature:\n" + "\n".join(h["text"] for h in hits) + "\n\n"
+                f"results: {len(state.test_results)} tested, "
+                f"{len(state.surviving_signals)} survived; "
+                + (f"test Sharpes: {[b.test_sharpe for b in state.backtest_results]}"
+                   if state.backtest_results else "null result")
+            )
+            polished = self.llm_client.polish_discussion(context)
+            if polished:
+                lines += ["## Discussion (LLM)", "", polished, ""]
         return lines
 
     def _limitations_section(self, state) -> list[str]:

@@ -18,3 +18,5 @@
 {"id": 18, "seed": "quiet-period drift before earnings", "min_hypotheses": 5}
 {"id": 19, "seed": "cross-sectional dispersion after vol spikes", "min_hypotheses": 5}
 {"id": 20, "seed": "persistently high volume and trend continuation", "min_hypotheses": 5}
+{"id": 21, "seed": "sector rotation momentum among sector ETFs", "min_hypotheses": 5, "config": {"bonferroni_alpha": 0.001, "bh_fdr_q": 0.001}, "note": "stress gates: only overwhelming evidence survives"}
+{"id": 22, "seed": "post-earnings drift in megacap tech", "min_hypotheses": 5, "config": {"min_events": 100000}, "note": "data-insufficiency stress: system must produce an honest null-result report, never crash"}

@@ -50,7 +50,7 @@ edges, HITL interrupt) with tool-calling over **4 custom MCP servers** (official
 | `mcp-market-data` | `get_ohlcv`, `get_earnings_calendar`, `list_universe`, `get_index_constituents` | yfinance wrapper + SHA-256-verified parquet cache, rate-limited; deterministic synthetic mode |
 | `mcp-statistics` | `run_ttest`, `run_ttest_1samp`, `run_mannwhitney`, `bootstrap_ci`, `apply_bonferroni`, `apply_bh_fdr` | scipy + numpy only; unit-tested against scipy and statsmodels references |
 | `mcp-backtest` | `run_event_backtest` | vectorized event study; strict train/test split; cost model |
-| `mcp-retrieval` | `semantic_search` | TF-IDF backend over a curated finance corpus (pluggable — swap in BGE+FAISS) |
+| `mcp-retrieval` | `semantic_search` | TF-IDF by default; **dense backend** (BGE-style encoder + cosine/FAISS) selected via `ALPHAFORGE_RETRIEVER=dense` — the drop-in slot for the BLaIR fine-tuned retriever |
 
 ### The LLM-optional design
 
@@ -89,13 +89,19 @@ alphaforge "post-earnings drift in megacap tech"   # full pipeline run (syntheti
 python evals/harness.py                     # 20-task eval suite -> evals/results.md
 ```
 
-Live data + Claude-refined hypotheses:
+Live data + Claude-refined hypotheses (real API calls with token-level cost
+accounting; fails loudly if the key is missing — never silently pretends):
 
 ```bash
 pip install -e ".[live,llm]"
 export ANTHROPIC_API_KEY=sk-...
 alphaforge "sector rotation momentum" --mode live --llm claude
 ```
+
+Prompts are versioned in `src/alphaforge/prompts/` (git history = audit
+trail). LLM output never enters the loop unvalidated: refined hypotheses must
+pass the same Pydantic schema, and invalid rewordings fall back to the
+deterministic template statement (tracked in `rejected_outputs`).
 
 Interactive human-in-the-loop checkpoint — genuinely pauses the graph
 (checkpointer-backed interrupt/resume) and waits for approve/reject:
@@ -128,6 +134,10 @@ alphaforge "volume shocks" --interactive
   }
 }
 ```
+
+The MCP servers are tested over the real wire protocol (official stdio
+client → JSON-RPC → all 4 servers), not just in-process — see
+`tests/test_mcp_protocol.py`.
 
 ## Eval results
 

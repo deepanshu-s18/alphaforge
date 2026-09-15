@@ -55,12 +55,14 @@ def run_suite(limit: int | None = None, out_json: Path = HERE / "results.json") 
     orch = Orchestrator()
 
     rows, completed, nulls, halluc, costs, calls, times = [], 0, 0, 0, 0.0, 0, 0.0
+    tool_rates = []
     for task in tasks:
         t0 = time.monotonic()
+        cfg_overrides = {"hitl_approve": True, **task.get("config", {})}
         try:
             state = orch.run(
                 task["seed"],
-                config=AgentConfig(hitl_approve=True).model_dump(mode="json"),
+                config=AgentConfig(**cfg_overrides).model_dump(mode="json"),
                 out_dir=str(HERE.parent / "reports" / "evals"),
             )
             ok = (
@@ -73,7 +75,8 @@ def run_suite(limit: int | None = None, out_json: Path = HERE / "results.json") 
         except Exception as e:  # noqa: BLE001 - a crashed task is a failed task, not a crashed suite
             log.error("task_crashed", task_id=task["id"], error=str(e))
             ok, m, h = False, {"n_hypotheses": 0, "n_survivors": 0, "cost_usd": 0.0,
-                               "llm_calls": 0, "null_result": True}, 0
+                               "llm_calls": 0, "null_result": True,
+                               "first_try_tool_rate": 0.0, "tool_calls": 0}, 0
         dt = time.monotonic() - t0
         completed += int(ok)
         nulls += int(m["null_result"])
@@ -81,11 +84,14 @@ def run_suite(limit: int | None = None, out_json: Path = HERE / "results.json") 
         costs += m["cost_usd"]
         calls += m["llm_calls"]
         times += dt
+        if m.get("tool_calls"):
+            tool_rates.append(m["first_try_tool_rate"])
         rows.append({
             "id": task["id"], "seed": task["seed"], "completed": ok,
             "n_hypotheses": m["n_hypotheses"], "n_tested": m.get("n_tested", 0),
             "n_survivors": m["n_survivors"], "null_result": m["null_result"],
             "hallucinations": h, "wall_s": round(dt, 2),
+            "first_try_tool_rate": m.get("first_try_tool_rate", 0.0),
         })
         log.info("task_done", id=task["id"], ok=ok, survivors=m["n_survivors"], wall_s=round(dt, 1))
 
@@ -98,6 +104,8 @@ def run_suite(limit: int | None = None, out_json: Path = HERE / "results.json") 
         "null_result_rate": round(nulls / n, 4),
         "avg_cost_usd": round(costs / n, 6),
         "avg_llm_calls": round(calls / n, 2),
+        "first_try_tool_accuracy": round(sum(tool_rates) / len(tool_rates), 4)
+        if tool_rates else 0.0,
         "avg_wall_s": round(times / n, 2),
         "rows": rows,
     }
@@ -122,19 +130,22 @@ def write_results_md(summary: dict, path: Path = HERE / "results.md") -> None:
         f"| Schema validity rate | {summary['schema_validity_rate']:.1%} |",
         f"| Hallucination count (ticker/window) | {summary['hallucination_count']} |",
         f"| Null-result rate | {summary['null_result_rate']:.1%} |",
+        f"| First-try tool accuracy | {summary['first_try_tool_accuracy']:.1%} |",
         f"| Avg LLM cost per task | ${summary['avg_cost_usd']:.4f} |",
         f"| Avg wall time per task | {summary['avg_wall_s']:.1f}s |",
         "",
         "## Per-task results",
         "",
-        "| ID | Seed | OK | Hypotheses | Tested | Survivors | Null | Halluc | Wall (s) |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| ID | Seed | OK | Hypotheses | Tested | Survivors | Null "
+        "| Halluc | Tool 1st-try | Wall (s) |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in summary["rows"]:
         lines.append(
             f"| {r['id']} | {r['seed'][:40]} | {'✔' if r['completed'] else '✘'} | "
             f"{r['n_hypotheses']} | {r['n_tested']} | {r['n_survivors']} | "
-            f"{'yes' if r['null_result'] else 'no'} | {r['hallucinations']} | {r['wall_s']} |"
+            f"{'yes' if r['null_result'] else 'no'} | {r['hallucinations']} | "
+            f"{r['first_try_tool_rate']:.0%} | {r['wall_s']} |"
         )
     lines += [
         "",
@@ -148,6 +159,9 @@ def write_results_md(summary: dict, path: Path = HERE / "results.md") -> None:
         "  +40bps/day, volume-shock drift −30bps/day, Monday −5bps); the null-result",
         "  rate measures how often the correction gates still reject everything,",
         "  i.e. how conservative the discovery loop is.",
+        "- Tasks 21-22 are deliberate stress tests: 21 tightens the correction",
+        "  gates (alpha=0.001/q=0.001); 22 forces data insufficiency (min_events",
+        "  100k) to exercise the genuine null-result path end-to-end.",
         "- Null results are a feature: the system is designed to kill bad ideas.",
         "",
     ]

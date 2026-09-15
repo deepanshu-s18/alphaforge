@@ -31,13 +31,25 @@ StateDict = dict[str, Any]
 
 
 class Orchestrator:
-    def __init__(self, llm_backend: str | None = None, data_mode: str | None = None):
+    def __init__(self, llm_backend: str | None = None, data_mode: str | None = None,
+                 llm_client_factory=None):
         # data_mode ("live"/"synthetic") propagates into the market-data tool
         self.hypothesis_agent = HypothesisAgent()
         self.data_agent = DataAgent(market_data=MarketData(mode=data_mode))
         self.validation_agent = ValidationAgent()
         self.backtest_agent = BacktestAgent()
         self.report_agent = ReportAgent()
+        self._llm_client_factory = llm_client_factory or self._default_llm_client
+
+    @staticmethod
+    def _default_llm_client():
+        from alphaforge.tools.llm import ClaudeClient
+
+        return ClaudeClient()
+
+    def _llm_client(self):
+        """Raises LLMUnavailable loudly when claude is requested but not set up."""
+        return self._llm_client_factory()
 
     # -- node wrappers (Pydantic model <-> dict for langgraph) --------------
     def _node_hypothesis(self, state: StateDict) -> StateDict:
@@ -53,6 +65,15 @@ class Orchestrator:
             rs.errors = rs.errors + [_err("hypothesis", None, str(e),
                                           "empty_hypothesis_list_fails_run")]
             rs.hypotheses = []
+        # optional LLM refinement: real API calls, real cost accounting,
+        # fails loudly if the backend is requested but unavailable
+        if rs.config.llm_backend == "claude" and rs.hypotheses:
+            client = self._llm_client()
+            rs.hypotheses = client.refine_hypotheses(rs.seed_query, rs.hypotheses)
+            rs.cost_usd = round(rs.cost_usd + client.usage.cost_usd, 6)
+            rs.llm_calls += client.usage.calls
+            for note in client.usage.notes:
+                log.warning("llm_refinement_note", note=note)
         return {**state, **rs.model_dump()}
 
     def _node_data(self, state: StateDict) -> StateDict:
@@ -103,7 +124,20 @@ class Orchestrator:
         rs = ResearchState(**state)
         rs.config = _cfg_from(state)
         ctx: RunContext = self._active_ctx
+        # reuse the same LLM client (accumulated usage) when claude backend
+        if rs.config.llm_backend == "claude" and self.report_agent.llm_client is None:
+            try:
+                self.report_agent.llm_client = self._llm_client()
+            except Exception as e:  # noqa: BLE001 - polish is optional
+                log.warning("llm_polish_unavailable", error=str(e))
+        before = 0.0
+        if self.report_agent.llm_client is not None:
+            before = self.report_agent.llm_client.usage.cost_usd
         rs = self.report_agent.run(rs, ctx, out_dir=state.get("out_dir", "reports"))
+        if self.report_agent.llm_client is not None:
+            delta = self.report_agent.llm_client.usage.cost_usd - before
+            rs.cost_usd = round(rs.cost_usd + delta, 6)
+            rs.llm_calls += self.report_agent.llm_client.usage.calls
         return {**state, **rs.model_dump()}
 
     # -- graph ---------------------------------------------------------------
@@ -159,7 +193,7 @@ class Orchestrator:
         )
         if "__interrupt__" in final:  # defensive: should not happen on this path
             raise RuntimeError("unexpected interrupt in auto-approve run")
-        return ResearchState(**{k: v for k, v in final.items() if not k.startswith("_")})
+        return self._finalize(final)
 
     def run_interactive(self, seed_query: str, config: dict | None = None,
                         out_dir: str = "reports",
@@ -190,7 +224,13 @@ class Orchestrator:
                 Command(resume=decision),
                 config={**thread, "recursion_limit": 50},
             )
-        return ResearchState(**{k: v for k, v in final.items() if not k.startswith("_")})
+        return self._finalize(final)
+
+    def _finalize(self, final: StateDict) -> ResearchState:
+        rs = ResearchState(**{k: v for k, v in final.items() if not k.startswith("_")})
+        rs.tool_calls = self._active_ctx.tool_calls
+        rs.first_try_tool_rate = self._active_ctx.first_try_rate
+        return rs
 
 
 def _cfg_from(state: StateDict):

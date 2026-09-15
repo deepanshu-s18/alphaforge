@@ -57,7 +57,14 @@ class TfidfRetriever:
                 for i in order if scores[i] > 0]
 
 
-def default_retriever(corpus_path: Path = DEFAULT_CORPUS) -> TfidfRetriever:
+def default_retriever(corpus_path: Path = DEFAULT_CORPUS,
+                      backend: str | None = None) -> TfidfRetriever | "DenseRetriever":
+    """Build the retriever selected by `backend` or ALPHAFORGE_RETRIEVER.
+
+    'tfidf' (default) needs nothing; 'dense' uses a BGE-style sentence
+    encoder + vector search (sentence-transformers optional, faiss optional)
+    — the drop-in slot for the BLaIR fine-tuned BGE retriever.
+    """
     corpus: list[tuple[str, str]] = []
     if corpus_path.exists():
         text = corpus_path.read_text()
@@ -66,10 +73,71 @@ def default_retriever(corpus_path: Path = DEFAULT_CORPUS) -> TfidfRetriever:
             if para:
                 first = para.splitlines()[0][:60]
                 corpus.append((para, f"corpus:{first}"))
+    backend = backend or __import__("os").environ.get("ALPHAFORGE_RETRIEVER", "tfidf")
+    if backend == "dense":
+        return DenseRetriever(corpus)
     return TfidfRetriever(corpus)
 
 
-def semantic_search(query: str, k: int = 5, retriever: TfidfRetriever | None = None) -> list[dict]:
+class DenseRetriever:
+    """Dense vector retriever — the BLaIR integration slot.
+
+    `encoder` is injectable for tests; in production it is a
+    sentence-transformers BGE model (e.g. the BLaIR fine-tuned checkpoint).
+    Similarity is cosine via numpy; if faiss is installed, an IndexFlatIP is
+    used instead (exact search, same results).
+    """
+
+    def __init__(self, corpus: list[tuple[str, str]], encoder=None):
+        self.docs = corpus
+        if encoder is None:
+            encoder = self._default_encoder()
+        self.encoder = encoder
+        import numpy as np
+
+        doc_vecs = np.asarray([self.encoder(t) for t, _ in corpus], dtype=float)
+        self._np = np
+        self.doc_vecs = doc_vecs / np.clip(np.linalg.norm(doc_vecs, axis=1, keepdims=True),
+                                           1e-12, None)
+        self._faiss_index = None
+        try:
+            import faiss  # type: ignore
+
+            self._faiss_index = faiss.IndexFlatIP(doc_vecs.shape[1])
+            self._faiss_index.add(self.doc_vecs.astype("float32"))
+        except ImportError:
+            pass
+
+    @staticmethod
+    def _default_encoder():
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as e:
+            raise ImportError(
+                "dense retriever requires sentence-transformers "
+                "(pip install sentence-transformers) or an injected encoder"
+            ) from e
+        model = SentenceTransformer("BAAI/bge-base-en-v1.5")
+        return lambda text: model.encode(text, normalize_embeddings=True)
+
+    def search(self, query: str, k: int = 5) -> list[RetrievalHit]:
+        np = self._np
+        q = np.asarray(self.encoder(query), dtype=float)
+        q = q / max(float(np.linalg.norm(q)), 1e-12)
+        if self._faiss_index is not None:
+            scores, idx = self._faiss_index.search(q[None, :].astype("float32"), k)
+            order = idx[0].tolist()
+            score_by_i = {int(i): float(s) for i, s in zip(idx[0], scores[0])}
+        else:
+            sims = self.doc_vecs @ q
+            order = np.argsort(-sims)[:k].tolist()
+            score_by_i = {int(i): float(sims[i]) for i in order}
+        return [RetrievalHit(self.docs[i][0], score_by_i[i], self.docs[i][1])
+                for i in order if i < len(self.docs)]
+
+
+def semantic_search(query: str, k: int = 5,
+                    retriever: "TfidfRetriever | DenseRetriever | None" = None) -> list[dict]:
     r = retriever or default_retriever()
     return [{"text": h.text, "score": round(h.score, 6), "source": h.source}
             for h in r.search(query, k)]

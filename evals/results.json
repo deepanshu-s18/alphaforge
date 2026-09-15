@@ -1,12 +1,13 @@
 {
-  "n_tasks": 20,
+  "n_tasks": 22,
   "task_completion_rate": 1.0,
   "schema_validity_rate": 1.0,
   "hallucination_count": 0,
-  "null_result_rate": 0.0,
+  "null_result_rate": 0.0455,
   "avg_cost_usd": 0.0,
   "avg_llm_calls": 0.0,
-  "avg_wall_s": 83.92,
+  "first_try_tool_accuracy": 1.0,
+  "avg_wall_s": 105.88,
   "rows": [
     {
       "id": 1,
@@ -17,7 +18,8 @@
       "n_survivors": 4,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 47.03
+      "wall_s": 79.19,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 2,
@@ -28,7 +30,8 @@
       "n_survivors": 4,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 27.62
+      "wall_s": 173.46,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 3,
@@ -39,7 +42,8 @@
       "n_survivors": 5,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 71.81
+      "wall_s": 359.65,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 4,
@@ -50,7 +54,8 @@
       "n_survivors": 5,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 84.47
+      "wall_s": 337.95,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 5,
@@ -61,7 +66,8 @@
       "n_survivors": 4,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 37.58
+      "wall_s": 248.49,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 6,
@@ -72,7 +78,8 @@
       "n_survivors": 4,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 67.44
+      "wall_s": 60.14,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 7,
@@ -83,7 +90,8 @@
       "n_survivors": 5,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 80.0
+      "wall_s": 109.58,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 8,
@@ -94,7 +102,8 @@
       "n_survivors": 5,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 29.56
+      "wall_s": 90.39,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 9,
@@ -105,7 +114,8 @@
       "n_survivors": 4,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 57.4
+      "wall_s": 64.56,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 10,
@@ -116,7 +126,8 @@
       "n_survivors": 5,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 63.05
+      "wall_s": 65.72,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 11,
@@ -127,7 +138,8 @@
       "n_survivors": 3,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 41.76
+      "wall_s": 56.59,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 12,
@@ -138,7 +150,8 @@
       "n_survivors": 4,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 139.89
+      "wall_s": 53.98,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 13,
@@ -149,7 +162,8 @@
       "n_survivors": 5,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 363.8
+      "wall_s": 95.26,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 14,
@@ -160,7 +174,8 @@
       "n_survivors": 5,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 38.28
+      "wall_s": 53.13,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 15,
@@ -171,7 +186,8 @@
       "n_survivors": 5,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 66.9
+      "wall_s": 78.9,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 16,
@@ -182,7 +198,8 @@
       "n_survivors": 3,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 163.56
+      "wall_s": 55.71,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 17,
@@ -193,7 +210,8 @@
       "n_survivors": 5,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 124.37
+      "wall_s": 122.28,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 18,
@@ -204,7 +222,8 @@
       "n_survivors": 5,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 40.38
+      "wall_s": 53.12,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 19,
@@ -215,7 +234,8 @@
       "n_survivors": 4,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 48.62
+      "wall_s": 55.77,
+      "first_try_tool_rate": 1.0
     },
     {
       "id": 20,
@@ -226,7 +246,32 @@
       "n_survivors": 5,
       "null_result": false,
       "hallucinations": 0,
-      "wall_s": 84.82
+      "wall_s": 85.63,
+      "first_try_tool_rate": 1.0
+    },
+    {
+      "id": 21,
+      "seed": "sector rotation momentum among sector ETFs",
+      "completed": true,
+      "n_hypotheses": 7,
+      "n_tested": 7,
+      "n_survivors": 4,
+      "null_result": false,
+      "hallucinations": 0,
+      "wall_s": 28.78,
+      "first_try_tool_rate": 1.0
+    },
+    {
+      "id": 22,
+      "seed": "post-earnings drift in megacap tech",
+      "completed": true,
+      "n_hypotheses": 7,
+      "n_tested": 0,
+      "n_survivors": 0,
+      "null_result": true,
+      "hallucinations": 0,
+      "wall_s": 1.13,
+      "first_try_tool_rate": 1.0
     }
   ]
 }
