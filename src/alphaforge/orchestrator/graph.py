@@ -24,6 +24,7 @@ from alphaforge.agents.report import ReportAgent
 from alphaforge.agents.validation import ValidationAgent
 from alphaforge.mcp_servers.market_data.server import MarketData
 from alphaforge.state.schema import AgentConfig, ResearchState
+from alphaforge.tools.llm import ClaudeClient, GeminiClient, LLMUnavailable
 from alphaforge.utils.logging import get_logger
 
 log = get_logger("alphaforge.orchestrator")
@@ -43,14 +44,44 @@ class Orchestrator:
         self._llm_client_factory = llm_client_factory or self._default_llm_client
 
     @staticmethod
-    def _default_llm_client():
-        from alphaforge.tools.llm import ClaudeClient
+    def _default_llm_client(backend: str = "claude"):
+        """Build the right client based on requested backend or available keys.
 
-        return ClaudeClient()
+        Priority: explicit llm_backend ('gemini' or 'claude').
+        Fails loudly (LLMUnavailable) when the backend is requested but unconfigured.
+        """
+        import os
+        if backend == "gemini":
+            if not os.environ.get("GEMINI_API_KEY"):
+                raise LLMUnavailable(
+                    "llm_backend='gemini' requires GEMINI_API_KEY (free at aistudio.google.com)"
+                )
+            return GeminiClient()
+        if backend == "claude":
+            if not os.environ.get("ANTHROPIC_API_KEY"):
+                raise LLMUnavailable(
+                    "llm_backend='claude' requires ANTHROPIC_API_KEY"
+                )
+            return ClaudeClient()
+        if os.environ.get("GEMINI_API_KEY"):
+            return GeminiClient()
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            return ClaudeClient()
+        raise LLMUnavailable(
+            "No LLM API key found. Set GEMINI_API_KEY (free at aistudio.google.com) "
+            "or ANTHROPIC_API_KEY to enable the LLM backend."
+        )
 
-    def _llm_client(self):
-        """Raises LLMUnavailable loudly when claude is requested but not set up."""
-        return self._llm_client_factory()
+    def _llm_client(self, backend: str = "claude"):
+        """Build and return the configured LLM client (Claude or Gemini).
+
+        Fails loudly via LLMUnavailable when the backend is requested
+        but the corresponding API key or package is missing.
+        """
+        try:
+            return self._llm_client_factory(backend=backend)
+        except TypeError:
+            return self._llm_client_factory()
 
     # -- node wrappers (Pydantic model <-> dict for langgraph) --------------
     def _make_nodes(self, ctx: RunContext):
@@ -74,8 +105,8 @@ class Orchestrator:
                 rs.hypotheses = []
             # optional LLM refinement: real API calls, real cost accounting,
             # fails loudly if the backend is requested but unavailable
-            if rs.config.llm_backend == "claude" and rs.hypotheses:
-                client = self._llm_client()
+            if rs.config.llm_backend in ("claude", "gemini") and rs.hypotheses:
+                client = self._llm_client(backend=rs.config.llm_backend)
                 rs.hypotheses = client.refine_hypotheses(rs.seed_query, rs.hypotheses)
                 rs.cost_usd = round(rs.cost_usd + client.usage.cost_usd, 6)
                 rs.llm_calls += client.usage.calls
@@ -125,10 +156,11 @@ class Orchestrator:
         def _node_report(state: StateDict) -> StateDict:
             rs = ResearchState(**state)
             rs.config = _cfg_from(state)
-            # reuse the same LLM client (accumulated usage) when claude backend
-            if rs.config.llm_backend == "claude" and self.report_agent.llm_client is None:
+            # reuse the same LLM client (accumulated usage) when claude or gemini backend
+            use_llm = rs.config.llm_backend in ("claude", "gemini")
+            if use_llm and self.report_agent.llm_client is None:
                 try:
-                    self.report_agent.llm_client = self._llm_client()
+                    self.report_agent.llm_client = self._llm_client(backend=rs.config.llm_backend)
                 except Exception as e:  # noqa: BLE001 - polish is optional
                     log.warning("llm_polish_unavailable", error=str(e))
             before = 0.0

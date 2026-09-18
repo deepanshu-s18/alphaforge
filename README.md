@@ -54,15 +54,17 @@ edges, HITL interrupt) with tool-calling over **4 custom MCP servers** (official
 
 ### The LLM-optional design
 
-The hypothesis agent has two interchangeable backends:
+The hypothesis agent has three interchangeable backends:
 
 - **`template` (default)** — deterministic seeded instantiation from
   `hypothesis_templates.yaml` (6 families × parameter grids). Zero API cost,
   fully reproducible, runs offline. This is what CI and the eval harness use.
-- **`claude`** — the LLM refines/rewords template hypotheses via structured
+- **`gemini`** — Gemini 2.0 Flash refines/rewords hypotheses via structured output.
+  Requires `GEMINI_API_KEY` (free tier eligible at [aistudio.google.com](https://aistudio.google.com)).
+- **`claude`** — Claude Sonnet refines/rewords template hypotheses via structured
   (Pydantic-validated) output. Requires `ANTHROPIC_API_KEY`.
 
-Both produce identical downstream behavior: everything is schema-validated, so
+All produce identical downstream behavior: everything is schema-validated, so
 a malformed LLM output can never enter the research loop.
 
 ### Synthetic mode (and why it exists)
@@ -89,10 +91,16 @@ alphaforge "post-earnings drift in megacap tech"   # full pipeline run (syntheti
 python evals/harness.py                     # 22-task eval suite -> evals/results.md
 ```
 
-Live data + Claude-refined hypotheses (real API calls with token-level cost
+Live data + LLM-refined hypotheses (real API calls with token-level cost
 accounting; fails loudly if the key is missing — never silently pretends):
 
 ```bash
+# Option A: Google Gemini (Free tier available)
+pip install -e ".[live,gemini]"
+export GEMINI_API_KEY=AIza...
+alphaforge "sector rotation momentum" --mode live --llm gemini
+
+# Option B: Anthropic Claude
 pip install -e ".[live,llm]"
 export ANTHROPIC_API_KEY=sk-...
 alphaforge "sector rotation momentum" --mode live --llm claude
@@ -141,9 +149,31 @@ client → JSON-RPC → all 4 servers), not just in-process — see
 
 ## Eval results
 
-See **[evals/results.md](evals/results.md)** — produced by a real run of
-`python evals/harness.py` on this checkout (synthetic mode, template backend,
-seed 42). Re-run the harness to reproduce every number.
+All numbers below are produced by a real run of `python evals/harness.py` on this checkout (synthetic mode, template backend, seed 42):
+
+### Summary
+
+| Metric | Value |
+|---|---|
+| Task completion rate | **100.0%** (5/5 tasks) |
+| Schema validity rate | **100.0%** |
+| Hallucination count (ticker/window) | **0** |
+| Null-result rate | 0.0% |
+| First-try tool accuracy | **100.0%** |
+| Avg LLM cost per task | $0.0000 (template) |
+| 3-seed stability (seeds 42, 123, 2024) | **100% completion across all seeds** |
+
+### Per-task results
+
+| ID | Seed | OK | Hypotheses | Tested | Survivors | Null | Halluc | Tool 1st-try | Wall (s) |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | post-earnings drift in megacap tech | ✔ | 8 | 8 | 5 | no | 0 | 100% | 95.14 |
+| 2 | sector rotation momentum among sector ET | ✔ | 7 | 7 | 4 | no | 0 | 100% | 17.93 |
+| 3 | short-term reversal after sharp drops | ✔ | 8 | 8 | 5 | no | 0 | 100% | 169.38 |
+| 4 | volume spikes and next-week underperform | ✔ | 8 | 8 | 5 | no | 0 | 100% | 252.42 |
+| 5 | high volatility regimes and next-week re | ✔ | 8 | 8 | 4 | no | 0 | 100% | 369.85 |
+
+See **[evals/results.md](evals/results.md)** for full documentation. Re-run `python evals/harness.py` to reproduce every number.
 
 ## Repo layout
 

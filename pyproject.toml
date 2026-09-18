@@ -24,10 +24,11 @@ dependencies = [
 [project.optional-dependencies]
 live = ["yfinance>=0.2.40"]
 llm = ["anthropic>=0.40.0"]
+gemini = ["google-generativeai>=0.8.0"]
 # mcp<2: FastMCP API; mcp 2.x renamed it to MCPServer (migration guide:
 # https://py.sdk.modelcontextprotocol.io/v2/migration )
 dev = ["pytest>=7.4", "pytest-cov", "ruff>=0.4.0", "statsmodels>=0.14",
-       "yfinance>=0.2.40", "mcp>=1.0,<2"]
+       "yfinance>=0.2.40", "mcp>=1.0,<2", "google-generativeai>=0.8.0"]
 
 [project.scripts]
 alphaforge = "alphaforge.cli:main"

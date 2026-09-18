@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
              "requirement that all experiments use 3-seed runs",
     )
     p.add_argument("--mode", choices=["synthetic", "live"], default="synthetic")
-    p.add_argument("--llm", choices=["template", "claude"], default="template")
+    p.add_argument("--llm", choices=["template", "claude", "gemini"], default="template")
     p.add_argument("--interactive", action="store_true",
                    help="pause at the HITL checkpoint for manual approve/reject "
                         "(default: auto-approve, headless-safe)")

@@ -93,6 +93,52 @@ class TestClaudeClient:
         assert c.polish_discussion("ctx") == "A grounded discussion."
 
 
+def _fake_gemini_client(payload_text: str, in_tok=1000, out_tok=200):
+    return SimpleNamespace(
+        GenerativeModel=lambda **kw: SimpleNamespace(
+            generate_content=lambda user, **k: SimpleNamespace(
+                text=payload_text,
+                usage_metadata=SimpleNamespace(
+                    prompt_token_count=in_tok,
+                    candidates_token_count=out_tok,
+                ),
+            )
+        )
+    )
+
+
+class TestGeminiClient:
+    def test_refine_applies_valid_statements(self):
+        from alphaforge.tools.llm import GeminiClient
+
+        hyps = _hyps()
+        payload = json.dumps({"hypotheses": [
+            {"id": h.id, "statement": f"GEMINI: {h.statement}"}
+            for h in hyps
+        ]})
+        c = GeminiClient(client=_fake_gemini_client(payload))
+        out = c.refine_hypotheses("q", hyps)
+        assert all(h.statement.startswith("GEMINI:") for h in out)
+        assert c.usage.calls == 1
+
+    def test_invalid_json_falls_back_to_templates(self):
+        from alphaforge.tools.llm import GeminiClient
+
+        hyps = _hyps()
+        original = [h.statement for h in hyps]
+        c = GeminiClient(client=_fake_gemini_client("not json at all"))
+        out = c.refine_hypotheses("q", hyps)
+        assert [h.statement for h in out] == original
+        assert c.usage.rejected_outputs == 1
+        assert c.usage.notes
+
+    def test_polish_discussion_returns_text(self):
+        from alphaforge.tools.llm import GeminiClient
+
+        c = GeminiClient(client=_fake_gemini_client("A grounded Gemini discussion."))
+        assert c.polish_discussion("ctx") == "A grounded Gemini discussion."
+
+
 class TestUnavailableBackend:
     def test_missing_package_raises_loudly(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-dummy")
@@ -128,6 +174,26 @@ class TestUnavailableBackend:
             Orchestrator().run(
                 "q",
                 config=AgentConfig(llm_backend="claude").model_dump(mode="json"),
+                out_dir="/tmp/never",
+            )
+
+    def test_missing_gemini_key_raises_loudly(self, monkeypatch):
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        from alphaforge.tools.llm import GeminiClient
+
+        with pytest.raises(LLMUnavailable, match="GEMINI_API_KEY"):
+            GeminiClient()
+
+    def test_orchestrator_gemini_mode_fails_loudly_without_key(self, monkeypatch):
+        """End-to-end guard: --llm gemini with no key must crash with a clear
+        message, never silently fall back to template mode."""
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        from alphaforge.orchestrator.graph import Orchestrator
+
+        with pytest.raises(LLMUnavailable, match="GEMINI_API_KEY"):
+            Orchestrator().run(
+                "q",
+                config=AgentConfig(llm_backend="gemini").model_dump(mode="json"),
                 out_dir="/tmp/never",
             )
 

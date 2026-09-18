@@ -24,6 +24,18 @@ jobs:
         run: ruff check src tests evals
       - name: Tests
         run: pytest -q --tb=short
+      - name: 3-seed stability (synthetic, template backend)
+        run: |
+          python evals/harness.py --limit 5 --agent-seed 42  --out evals/stability_s42.json
+          python evals/harness.py --limit 5 --agent-seed 123 --out evals/stability_s123.json
+          python evals/harness.py --limit 5 --agent-seed 2024 --out evals/stability_s2024.json
+          python - <<'EOF'
+          import json
+          for s in [42, 123, 2024]:
+              r = json.load(open(f"evals/stability_s{s}.json"))
+              assert r["task_completion_rate"] == 1.0, f"seed {s}: rate={r['task_completion_rate']}"
+              print(f"seed {s}: completion={r['task_completion_rate']:.0%} ✓")
+          EOF
 
   docker:
     runs-on: ubuntu-latest

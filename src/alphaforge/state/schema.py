@@ -136,7 +136,7 @@ class AgentConfig(BaseModel):
     train_end: date = date(2022, 12, 31)
     test_start: date = date(2023, 1, 1)
     data_mode: Literal["synthetic", "live"] = "synthetic"
-    llm_backend: Literal["template", "claude"] = "template"
+    llm_backend: Literal["template", "claude", "gemini"] = "template"
     hitl_approve: bool = True  # CI/eval runs auto-approve at the checkpoint
 
 

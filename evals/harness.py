@@ -51,7 +51,7 @@ def count_hallucinations(state, universe: set[str], start: str, end: str) -> int
 
 
 def run_suite(limit: int | None = None, out_json: Path = HERE / "results.json",
-              mode: str = "synthetic") -> dict:
+              mode: str = "synthetic", agent_seed: int = 42) -> dict:
     tasks = load_tasks()[: limit or None]
     universe = set(all_tickers(load_universe()))
     u_cfg = load_universe()["data"]
@@ -61,7 +61,7 @@ def run_suite(limit: int | None = None, out_json: Path = HERE / "results.json",
     tool_rates = []
     for task in tasks:
         t0 = time.monotonic()
-        cfg_overrides = {"hitl_approve": True, **task.get("config", {})}
+        cfg_overrides = {"hitl_approve": True, "seed": agent_seed, **task.get("config", {})}
         try:
             state = orch.run(
                 task["seed"],
@@ -185,6 +185,9 @@ def main():
                     help="synthetic: seeded fake OHLCV (offline, CI). "
                          "live: real yfinance data (requires internet, "
                          "caches to data/live_cache/).")
+    ap.add_argument("--agent-seed", type=int, default=42,
+                    help="AgentConfig.seed — controls hypothesis RNG (default 42). "
+                         "Run with 42, 123, 2024 for 3-seed stability.")
     args = ap.parse_args()
 
     # Live mode writes to a separate file so synthetic baseline is preserved
@@ -192,7 +195,8 @@ def main():
         args.out = HERE / ("results_live.json" if args.mode == "live" else "results.json")
     md_path = HERE / ("results_live.md" if args.mode == "live" else "results.md")
 
-    summary = run_suite(limit=args.limit, out_json=args.out, mode=args.mode)
+    summary = run_suite(limit=args.limit, out_json=args.out, mode=args.mode,
+                        agent_seed=args.agent_seed)
     write_results_md(summary, path=md_path, mode=args.mode)
     print(json.dumps({k: v for k, v in summary.items() if k != "rows"}, indent=2))
 
