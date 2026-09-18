@@ -62,8 +62,18 @@ def _split_metrics(rets: np.ndarray, dates: pd.Series, cost_bps: float,
     }
 
 
+_EMPTY_EARNINGS = pd.DataFrame(columns=["ticker", "date", "surprise_pct", "bmo_amc"])
+
+
 def run_event_backtest(request: BacktestRequest, ohlcv: pd.DataFrame,
-                       earnings: pd.DataFrame) -> dict:
+                       earnings: pd.DataFrame | None) -> dict:
+    """Out-of-sample event backtest for a signal spec.
+
+    `earnings` may be None when the data agent failed for that kind; it is
+    normalised to an empty DataFrame so downstream builders never receive None.
+    """
+    if earnings is None:
+        earnings = _EMPTY_EARNINGS
     s = request.signal
     ohlcv = ohlcv[ohlcv["ticker"].isin(s.tickers)]
     if not earnings.empty:

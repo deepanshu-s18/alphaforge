@@ -1,4 +1,4 @@
-"""Eval harness: run the 20-task suite end-to-end and measure the system.
+"""Eval harness: run the 22-task suite end-to-end and measure the system.
 
 Metrics:
   task_completion_rate   report produced without crash + min hypotheses met
@@ -12,7 +12,9 @@ Metrics:
   avg wall time
 
 Usage:
-  python evals/harness.py [--out evals/results.json] [--limit N]
+  python evals/harness.py                      # synthetic mode (CI/offline)
+  python evals/harness.py --mode live          # real yfinance data (caches to data/live_cache/)
+  python evals/harness.py --mode live --limit 5  # smoke test with live data
 """
 
 from __future__ import annotations
@@ -48,11 +50,12 @@ def count_hallucinations(state, universe: set[str], start: str, end: str) -> int
     return bad
 
 
-def run_suite(limit: int | None = None, out_json: Path = HERE / "results.json") -> dict:
+def run_suite(limit: int | None = None, out_json: Path = HERE / "results.json",
+              mode: str = "synthetic") -> dict:
     tasks = load_tasks()[: limit or None]
     universe = set(all_tickers(load_universe()))
     u_cfg = load_universe()["data"]
-    orch = Orchestrator()
+    orch = Orchestrator(data_mode=mode)
 
     rows, completed, nulls, halluc, costs, calls, times = [], 0, 0, 0, 0.0, 0, 0.0
     tool_rates = []
@@ -113,12 +116,18 @@ def run_suite(limit: int | None = None, out_json: Path = HERE / "results.json") 
     return summary
 
 
-def write_results_md(summary: dict, path: Path = HERE / "results.md") -> None:
+def write_results_md(summary: dict, path: Path = HERE / "results.md",
+                     mode: str = "synthetic") -> None:
+    mode_note = (
+        "live yfinance data, template LLM backend, seed 42"
+        if mode == "live"
+        else "synthetic data mode, template LLM backend, seed 42"
+    )
     lines = [
-        "# AlphaForge eval results — 20-task suite",
+        "# AlphaForge eval results — 22-task suite",
         "",
-        "All numbers below are produced by `python evals/harness.py` on this",
-        "checkout (synthetic data mode, template LLM backend, seed 42).",
+        f"All numbers below are produced by `python evals/harness.py --mode {mode}` on this",
+        f"checkout ({mode_note}).",
         "Re-run the harness to reproduce them exactly.",
         "",
         "## Summary",
@@ -171,10 +180,20 @@ def write_results_md(summary: dict, path: Path = HERE / "results.md") -> None:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None)
-    ap.add_argument("--out", type=Path, default=HERE / "results.json")
+    ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--mode", choices=["synthetic", "live"], default="synthetic",
+                    help="synthetic: seeded fake OHLCV (offline, CI). "
+                         "live: real yfinance data (requires internet, "
+                         "caches to data/live_cache/).")
     args = ap.parse_args()
-    summary = run_suite(limit=args.limit, out_json=args.out)
-    write_results_md(summary)
+
+    # Live mode writes to a separate file so synthetic baseline is preserved
+    if args.out is None:
+        args.out = HERE / ("results_live.json" if args.mode == "live" else "results.json")
+    md_path = HERE / ("results_live.md" if args.mode == "live" else "results.md")
+
+    summary = run_suite(limit=args.limit, out_json=args.out, mode=args.mode)
+    write_results_md(summary, path=md_path, mode=args.mode)
     print(json.dumps({k: v for k, v in summary.items() if k != "rows"}, indent=2))
 
 

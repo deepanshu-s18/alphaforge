@@ -87,6 +87,14 @@ class Signal(BaseModel):
 
 
 class BacktestResult(BaseModel):
+    """Per-signal out-of-sample backtest result.
+
+    n_train_independent / n_test_independent count non-overlapping event
+    windows (events >= holding_days apart) — the honest sample size for
+    overlapping event studies. Default 0 means the backtest ran but the
+    count was not returned by the underlying tool (treat as unknown, not zero).
+    """
+
     signal_id: str
     hypothesis_id: str
     train_sharpe: float
@@ -95,8 +103,12 @@ class BacktestResult(BaseModel):
     test_max_drawdown: float
     test_win_rate: float
     n_train_events: int
-    n_train_independent: int = 0
-    n_test_independent: int = 0
+    n_train_independent: int = Field(
+        default=0, description="non-overlapping train events; 0 = unknown"
+    )
+    n_test_independent: int = Field(
+        default=0, description="non-overlapping test events; 0 = unknown"
+    )
     n_test_events: int
     cost_bps: float
     notes: str = ""

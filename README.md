@@ -74,7 +74,7 @@ verifiable end-to-end with no network, no keys, no flakiness:
 
 - statistics tests assert exact scipy parity
 - backtest tests assert **sign recovery** of the planted effects
-- the eval harness runs 20 tasks deterministically in CI
+- the eval harness runs 22 tasks deterministically in CI
 - the null-result path is exercised with impossible gates
 
 `mode: live` switches to real yfinance data through the same cache/schema layer.
@@ -86,7 +86,7 @@ Everything downstream is mode-agnostic.
 pip install -e ".[dev]"
 pytest -q                                   # 50+ tests, offline
 alphaforge "post-earnings drift in megacap tech"   # full pipeline run (synthetic)
-python evals/harness.py                     # 20-task eval suite -> evals/results.md
+python evals/harness.py                     # 22-task eval suite -> evals/results.md
 ```
 
 Live data + Claude-refined hypotheses (real API calls with token-level cost
@@ -157,7 +157,7 @@ src/alphaforge/
 ├── events/builders.py           # family event builders (validation ≡ backtest)
 ├── utils/                       # cache, config, JSON logging
 └── cli.py                       # alphaforge CLI
-evals/                           # 20-task suite + harness + real results
+evals/                           # 22-task suite + harness + real results
 tests/                           # 50+ unit/integration tests (offline)
 ```
 

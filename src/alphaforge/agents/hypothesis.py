@@ -9,6 +9,7 @@ Two backends behind one interface:
 
 from __future__ import annotations
 
+import hashlib
 import itertools
 from pathlib import Path
 
@@ -60,7 +61,9 @@ class HypothesisAgent:
         tests a genuinely distinct hypothesis set. Same seed + same query
         still reproduces byte-identical output.
         """
-        query_key = sum(map(ord, seed_query)) % (2**31)
+        # SHA-256 is collision-resistant and order-sensitive; sum(ord()) collides
+        # on any anagram (e.g. "abc" == "bca"), producing identical RNG streams.
+        query_key = int(hashlib.sha256(seed_query.encode()).hexdigest()[:8], 16) % (2**31)
         rng = __import__("numpy").random.default_rng(seed + query_key)
         # simple lexical relevance: templates whose family/keywords match the
         # seed query are ordered first (deterministic, no LLM required)

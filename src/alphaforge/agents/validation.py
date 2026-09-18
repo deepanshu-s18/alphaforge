@@ -37,14 +37,20 @@ class ValidationAgent:
         return fn(*args, **kwargs)
 
     def _effect_and_ci(self, sample, baseline, h: Hypothesis, cfg) -> tuple[float, float, float]:
-        """Effect size (bps) and bootstrap CI of the effect."""
+        """Effect size (bps) and bootstrap CI of the effect.
+
+        Each hypothesis gets a unique but deterministic seed derived from
+        cfg.bootstrap_seed + a hash of the hypothesis id, so different
+        hypotheses produce different (realistic) CI widths while the overall
+        run remains reproducible given the same config.
+        """
+        h_seed = (cfg.bootstrap_seed + sum(map(ord, h.id))) % (2**31)
+        rng = np.random.default_rng(h_seed)
         if h.test_type == "one_sample_ttest":
             vals = sample
-            rng = np.random.default_rng(cfg.bootstrap_seed)
             boots = rng.choice(vals, size=(cfg.bootstrap_iters, len(vals))).mean(axis=1)
             effect = vals.mean()
         else:
-            rng = np.random.default_rng(cfg.bootstrap_seed)
             boots = (
                 rng.choice(sample, size=(cfg.bootstrap_iters, len(sample))).mean(axis=1)
                 - rng.choice(baseline, size=(cfg.bootstrap_iters, len(baseline))).mean(axis=1)
@@ -56,6 +62,11 @@ class ValidationAgent:
     def run(self, state: ResearchState, ctx: RunContext) -> ResearchState:
         cfg = state.config
         if ctx.data.get("ohlcv") is None:
+            log.warning("validation_no_data", reason="ohlcv absent — all hypotheses untestable")
+            state.errors.append(AgentError(
+                agent="validation", error="ohlcv data absent from context",
+                fallback_action="mark_all_untestable"
+            ))
             for h in state.hypotheses:
                 h.status = "untestable"
             return state
@@ -107,12 +118,17 @@ class ValidationAgent:
         for r, b, f in zip(results, bonf, bh):
             r.bonferroni_significant = b
             r.bh_fdr_significant = f
-            r.corrected_significant = b or f
+            # spec: Bonferroni AND BH-FDR — both gates must agree.
+            # Using `or` would allow either test alone to promote a signal,
+            # which is exactly the p-hacking this system is designed to prevent.
+            r.corrected_significant = b and f
             h = by_id[r.hypothesis_id]
+            # Direct comparison avoids np.sign(0.0) == 0.0 which is neither
+            # > 0 nor < 0, making an exact-zero effect silently ambiguous.
             sign_ok = (
-                np.sign(r.effect_size) > 0
+                r.effect_size > 0
                 if h.expected_effect == "positive"
-                else np.sign(r.effect_size) < 0
+                else r.effect_size < 0
             )
             if r.corrected_significant and sign_ok:
                 h.status = "validated"

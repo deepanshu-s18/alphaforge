@@ -10,6 +10,7 @@ Routing:
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from langgraph.graph import END, StateGraph
@@ -52,103 +53,115 @@ class Orchestrator:
         return self._llm_client_factory()
 
     # -- node wrappers (Pydantic model <-> dict for langgraph) --------------
-    def _node_hypothesis(self, state: StateDict) -> StateDict:
-        rs = ResearchState(**state)
-        ctx: RunContext = self._active_ctx
-        try:
-            rs.hypotheses = self.hypothesis_agent.generate(
-                rs.seed_query, n_target=8, seed=rs.config.seed
-            )
-            ctx.record_tool(True)
-        except Exception as e:  # noqa: BLE001
-            ctx.record_tool(False)
-            rs.errors = rs.errors + [_err("hypothesis", None, str(e),
-                                          "empty_hypothesis_list_fails_run")]
-            rs.hypotheses = []
-        # optional LLM refinement: real API calls, real cost accounting,
-        # fails loudly if the backend is requested but unavailable
-        if rs.config.llm_backend == "claude" and rs.hypotheses:
-            client = self._llm_client()
-            rs.hypotheses = client.refine_hypotheses(rs.seed_query, rs.hypotheses)
-            rs.cost_usd = round(rs.cost_usd + client.usage.cost_usd, 6)
-            rs.llm_calls += client.usage.calls
-            for note in client.usage.notes:
-                log.warning("llm_refinement_note", note=note)
-        return {**state, **rs.model_dump()}
+    def _make_nodes(self, ctx: RunContext):
+        """Return a dict of node-name -> callable, each closing over `ctx`.
 
-    def _node_data(self, state: StateDict) -> StateDict:
-        rs = ResearchState(**state)
-        rs.config = _cfg_from(state)
-        ctx: RunContext = self._active_ctx
-        rs = self.data_agent.run(rs, ctx)
-        return {**state, **rs.model_dump()}
-
-    def _node_validation(self, state: StateDict) -> StateDict:
-        rs = ResearchState(**state)
-        rs.config = _cfg_from(state)
-        ctx: RunContext = self._active_ctx
-        rs = self.validation_agent.run(rs, ctx)
-        return {**state, **rs.model_dump()}
-
-    def _node_hitl(self, state: StateDict) -> StateDict:
-        rs = ResearchState(**state)
-        log.info(
-            "hitl_checkpoint",
-            survivors=len(rs.surviving_signals),
-            mode="auto_approve" if rs.config.hitl_approve else "interactive",
-        )
-        state = {**state, "survivors_count": len(rs.surviving_signals)}
-        if not rs.config.hitl_approve:
-            # interrupts the graph (requires checkpointer, see run_interactive);
-            # resumes with "approve"/"reject" via Command(resume=...)
-            from langgraph.types import interrupt
-
-            decision = interrupt(
-                f"{len(rs.surviving_signals)} signals passed validation. "
-                f"Approve backtesting? [approve/reject]"
-            )
-            state["hitl_decision"] = str(decision).lower()
-        return {**state, "hitl_decision": state.get("hitl_decision", "approve")}
-
-    def _node_backtest(self, state: StateDict) -> StateDict:
-        rs = ResearchState(**state)
-        rs.config = _cfg_from(state)
-        ctx: RunContext = self._active_ctx
-        if state.get("hitl_decision") == "reject":
-            log.info("hitl_rejected", skipped=len(rs.surviving_signals))
-            return state
-        rs = self.backtest_agent.run(rs, ctx)
-        return {**state, **rs.model_dump()}
-
-    def _node_report(self, state: StateDict) -> StateDict:
-        rs = ResearchState(**state)
-        rs.config = _cfg_from(state)
-        ctx: RunContext = self._active_ctx
-        # reuse the same LLM client (accumulated usage) when claude backend
-        if rs.config.llm_backend == "claude" and self.report_agent.llm_client is None:
+        Capturing ctx as a closure argument (not self._active_ctx) means each
+        call to run()/run_interactive() gets its own isolated context, safe for
+        sequential reuse of the same Orchestrator instance across eval tasks.
+        """
+        def _node_hypothesis(state: StateDict) -> StateDict:
+            rs = ResearchState(**state)
             try:
-                self.report_agent.llm_client = self._llm_client()
-            except Exception as e:  # noqa: BLE001 - polish is optional
-                log.warning("llm_polish_unavailable", error=str(e))
-        before = 0.0
-        if self.report_agent.llm_client is not None:
-            before = self.report_agent.llm_client.usage.cost_usd
-        rs = self.report_agent.run(rs, ctx, out_dir=state.get("out_dir", "reports"))
-        if self.report_agent.llm_client is not None:
-            delta = self.report_agent.llm_client.usage.cost_usd - before
-            rs.cost_usd = round(rs.cost_usd + delta, 6)
-            rs.llm_calls += self.report_agent.llm_client.usage.calls
-        return {**state, **rs.model_dump()}
+                rs.hypotheses = self.hypothesis_agent.generate(
+                    rs.seed_query, n_target=8, seed=rs.config.seed
+                )
+                ctx.record_tool(True)
+            except Exception as e:  # noqa: BLE001
+                ctx.record_tool(False)
+                rs.errors = rs.errors + [_err("hypothesis", None, str(e),
+                                              "empty_hypothesis_list_fails_run")]
+                rs.hypotheses = []
+            # optional LLM refinement: real API calls, real cost accounting,
+            # fails loudly if the backend is requested but unavailable
+            if rs.config.llm_backend == "claude" and rs.hypotheses:
+                client = self._llm_client()
+                rs.hypotheses = client.refine_hypotheses(rs.seed_query, rs.hypotheses)
+                rs.cost_usd = round(rs.cost_usd + client.usage.cost_usd, 6)
+                rs.llm_calls += client.usage.calls
+                for note in client.usage.notes:
+                    log.warning("llm_refinement_note", note=note)
+            return {**state, **rs.model_dump()}
+
+        def _node_data(state: StateDict) -> StateDict:
+            rs = ResearchState(**state)
+            rs.config = _cfg_from(state)
+            rs = self.data_agent.run(rs, ctx)
+            return {**state, **rs.model_dump()}
+
+        def _node_validation(state: StateDict) -> StateDict:
+            rs = ResearchState(**state)
+            rs.config = _cfg_from(state)
+            rs = self.validation_agent.run(rs, ctx)
+            return {**state, **rs.model_dump()}
+
+        def _node_hitl(state: StateDict) -> StateDict:
+            rs = ResearchState(**state)
+            log.info(
+                "hitl_checkpoint",
+                survivors=len(rs.surviving_signals),
+                mode="auto_approve" if rs.config.hitl_approve else "interactive",
+            )
+            state = {**state, "survivors_count": len(rs.surviving_signals)}
+            if not rs.config.hitl_approve:
+                from langgraph.types import interrupt
+
+                decision = interrupt(
+                    f"{len(rs.surviving_signals)} signals passed validation. "
+                    f"Approve backtesting? [approve/reject]"
+                )
+                state["hitl_decision"] = str(decision).lower()
+            return {**state, "hitl_decision": state.get("hitl_decision", "approve")}
+
+        def _node_backtest(state: StateDict) -> StateDict:
+            rs = ResearchState(**state)
+            rs.config = _cfg_from(state)
+            if state.get("hitl_decision") == "reject":
+                log.info("hitl_rejected", skipped=len(rs.surviving_signals))
+                return state
+            rs = self.backtest_agent.run(rs, ctx)
+            return {**state, **rs.model_dump()}
+
+        def _node_report(state: StateDict) -> StateDict:
+            rs = ResearchState(**state)
+            rs.config = _cfg_from(state)
+            # reuse the same LLM client (accumulated usage) when claude backend
+            if rs.config.llm_backend == "claude" and self.report_agent.llm_client is None:
+                try:
+                    self.report_agent.llm_client = self._llm_client()
+                except Exception as e:  # noqa: BLE001 - polish is optional
+                    log.warning("llm_polish_unavailable", error=str(e))
+            before = 0.0
+            if self.report_agent.llm_client is not None:
+                before = self.report_agent.llm_client.usage.cost_usd
+            rs = self.report_agent.run(rs, ctx, out_dir=state.get("out_dir", "reports"))
+            if self.report_agent.llm_client is not None:
+                delta = self.report_agent.llm_client.usage.cost_usd - before
+                rs.cost_usd = round(rs.cost_usd + delta, 6)
+                rs.llm_calls += self.report_agent.llm_client.usage.calls
+            return {**state, **rs.model_dump()}
+
+        return {
+            "hypothesis": _node_hypothesis,
+            "data": _node_data,
+            "validation": _node_validation,
+            "hitl": _node_hitl,
+            "backtest": _node_backtest,
+            "report": _node_report,
+        }
 
     # -- graph ---------------------------------------------------------------
-    def build_graph(self, checkpointer=None):
+    def build_graph(self, ctx: RunContext, checkpointer=None):
+        """Build the LangGraph StateGraph, closing node functions over `ctx`.
+
+        Receiving `ctx` explicitly (rather than reading self._active_ctx inside
+        node closures) ensures each run gets its own isolated context and the
+        Orchestrator instance can be safely reused across sequential eval tasks.
+        """
+        nodes = self._make_nodes(ctx)
         g = StateGraph(StateDict)
-        g.add_node("hypothesis", self._node_hypothesis)
-        g.add_node("data", self._node_data)
-        g.add_node("validation", self._node_validation)
-        g.add_node("hitl", self._node_hitl)
-        g.add_node("backtest", self._node_backtest)
-        g.add_node("report", self._node_report)
+        for name, fn in nodes.items():
+            g.add_node(name, fn)
         g.set_entry_point("hypothesis")
         g.add_edge("hypothesis", "data")
         g.add_edge("data", "validation")
@@ -181,8 +194,8 @@ class Orchestrator:
             )
         # data_mode flows from the caller's AgentConfig into the market-data tool
         self.data_agent = DataAgent(market_data=MarketData(mode=cfg.data_mode))
-        self._active_ctx = RunContext(config=cfg)
-        graph = self.build_graph()
+        ctx = RunContext(config=cfg)
+        graph = self.build_graph(ctx)
         final: StateDict = graph.invoke(
             {
                 "seed_query": seed_query,
@@ -193,7 +206,7 @@ class Orchestrator:
         )
         if "__interrupt__" in final:  # defensive: should not happen on this path
             raise RuntimeError("unexpected interrupt in auto-approve run")
-        return self._finalize(final)
+        return self._finalize(final, ctx)
 
     def run_interactive(self, seed_query: str, config: dict | None = None,
                         out_dir: str = "reports",
@@ -208,9 +221,11 @@ class Orchestrator:
 
         cfg = AgentConfig(**{**(config or {}), "hitl_approve": False})
         self.data_agent = DataAgent(market_data=MarketData(mode=cfg.data_mode))
-        self._active_ctx = RunContext(config=cfg)
-        graph = self.build_graph(checkpointer=MemorySaver())
-        thread = {"configurable": {"thread_id": f"hitl-{abs(hash(seed_query))}"}}
+        ctx = RunContext(config=cfg)
+        graph = self.build_graph(ctx, checkpointer=MemorySaver())
+        # uuid4() guarantees a unique thread per run; hash() is PYTHONHASHSEED-randomized
+        # and can collide for the same query in the same process session.
+        thread = {"configurable": {"thread_id": f"hitl-{uuid.uuid4().hex}"}}
         state_in = {
             "seed_query": seed_query,
             "config": cfg.model_dump(mode="json"),
@@ -224,12 +239,12 @@ class Orchestrator:
                 Command(resume=decision),
                 config={**thread, "recursion_limit": 50},
             )
-        return self._finalize(final)
+        return self._finalize(final, ctx)
 
-    def _finalize(self, final: StateDict) -> ResearchState:
+    def _finalize(self, final: StateDict, ctx: RunContext) -> ResearchState:
         rs = ResearchState(**{k: v for k, v in final.items() if not k.startswith("_")})
-        rs.tool_calls = self._active_ctx.tool_calls
-        rs.first_try_tool_rate = self._active_ctx.first_try_rate
+        rs.tool_calls = ctx.tool_calls
+        rs.first_try_tool_rate = ctx.first_try_rate
         return rs
 
 
