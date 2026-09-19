@@ -292,7 +292,16 @@ class ForgeLMClient:
         self.model = model
         self.base_url = base_url
         self.usage = LLMUsage()  # $0 inference cost for local SLM
-        self._client = client or self._make_client()
+        self._injected_client = client
+        self._cached_client = None
+
+    @property
+    def _client(self):
+        if self._injected_client is not None:
+            return self._injected_client
+        if self._cached_client is None:
+            self._cached_client = self._make_client()
+        return self._cached_client
 
     def _make_client(self):
         try:
