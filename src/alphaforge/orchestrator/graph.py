@@ -24,7 +24,7 @@ from alphaforge.agents.report import ReportAgent
 from alphaforge.agents.validation import ValidationAgent
 from alphaforge.mcp_servers.market_data.server import MarketData
 from alphaforge.state.schema import AgentConfig, ResearchState
-from alphaforge.tools.llm import ClaudeClient, GeminiClient, LLMUnavailable
+from alphaforge.tools.llm import ClaudeClient, ForgeLMClient, GeminiClient, LLMUnavailable
 from alphaforge.utils.logging import get_logger
 
 log = get_logger("alphaforge.orchestrator")
@@ -57,6 +57,8 @@ class Orchestrator:
                     "llm_backend='gemini' requires GEMINI_API_KEY (free at aistudio.google.com)"
                 )
             return GeminiClient()
+        if backend == "forgelm":
+            return ForgeLMClient()
         if backend == "claude":
             if not os.environ.get("ANTHROPIC_API_KEY"):
                 raise LLMUnavailable(

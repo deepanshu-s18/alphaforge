@@ -274,3 +274,110 @@ class GeminiClient:
         except Exception as e:  # noqa: BLE001
             self.usage.notes.append(f"gemini polish failed: {e}")
             return None
+
+
+class ForgeLMClient:
+    """ForgeLM client: local vLLM OpenAI-compatible endpoint.
+
+    Fulfills Tower Portfolio Build Spec Section 2.7:
+    Drop-in replacement for Claude/Gemini with $0 inference cost.
+    """
+
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8000/v1",
+        model: str = "forgelm",
+        client: Any | None = None,
+    ):
+        self.model = model
+        self.base_url = base_url
+        self.usage = LLMUsage()  # $0 inference cost for local SLM
+        self._client = client or self._make_client()
+
+    def _make_client(self):
+        try:
+            from openai import OpenAI
+        except ImportError as e:
+            raise LLMUnavailable(
+                "llm_backend='forgelm' requires openai package (pip install openai)"
+            ) from e
+        return OpenAI(base_url=self.base_url, api_key="none")
+
+    def refine_hypotheses(self, seed_query: str, hypotheses: list[Hypothesis]) -> list[Hypothesis]:
+        system = load_prompt("hypothesis_refine")
+        user = json.dumps({
+            "seed_query": seed_query,
+            "hypotheses": [
+                {
+                    "id": h.id, "statement": h.statement, "family": h.family,
+                    "instrument_scope": h.instrument_scope, "event_def": h.event_def,
+                    "expected_effect": h.expected_effect,
+                }
+                for h in hypotheses
+            ],
+        })
+        try:
+            resp = self._client.chat.completions.create(
+                model=self.model,
+                temperature=0.0,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+            raw = resp.choices[0].message.content or ""
+            u = getattr(resp, "usage", None)
+            if u is not None:
+                self.usage.calls += 1
+                self.usage.input_tokens += int(getattr(u, "prompt_tokens", 0))
+                self.usage.output_tokens += int(getattr(u, "completion_tokens", 0))
+                # Local inference: cost_usd stays 0.0
+            refined = ClaudeClient._parse_json(raw)
+            if refined is None:
+                self.usage.rejected_outputs += 1
+                self.usage.notes.append("forgelm: output not valid JSON; kept templates")
+                return hypotheses
+
+            by_id = {h.id: h for h in hypotheses}
+            seen: set[str] = set()
+            out = list(hypotheses)
+            for item in refined.get("hypotheses", []):
+                hid = item.get("id")
+                if hid not in by_id or hid in seen:
+                    continue
+                base = by_id[hid]
+                try:
+                    stmt = str(item.get("statement", ""))
+                    candidate = base.model_copy(update={"statement": stmt})
+                    Hypothesis.model_validate(candidate.model_dump())
+                    out[out.index(base)] = candidate
+                    seen.add(hid)
+                except Exception:  # noqa: BLE001
+                    self.usage.rejected_outputs += 1
+                    self.usage.notes.append(f"{hid}: invalid forgelm refinement; kept template")
+            return out
+        except Exception as e:  # noqa: BLE001
+            if isinstance(e, LLMUnavailable):
+                raise
+            self.usage.notes.append(f"forgelm call failed: {e}; kept templates")
+            return hypotheses
+
+    def polish_discussion(self, context: str) -> str | None:
+        try:
+            resp = self._client.chat.completions.create(
+                model=self.model,
+                temperature=0.3,
+                max_tokens=600,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Polish this financial research discussion. Be concise.",
+                    },
+                    {"role": "user", "content": context},
+                ],
+            )
+            return resp.choices[0].message.content.strip() or None
+        except Exception as e:  # noqa: BLE001
+            self.usage.notes.append(f"forgelm polish failed: {e}")
+            return None
+

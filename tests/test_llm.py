@@ -215,3 +215,49 @@ class TestCostFlowsThroughState:
         m = rs.to_metrics()
         assert m["cost_usd"] == 0.006
         assert m["llm_calls"] == 1
+
+
+class TestForgeLMClient:
+    def test_refine_with_fake_openai_client(self):
+        from alphaforge.tools.llm import ForgeLMClient
+
+        hyps = _hyps()
+        payload = json.dumps({"hypotheses": [
+            {"id": h.id, "statement": f"FORGELM: {h.statement}"}
+            for h in hyps
+        ]})
+        mock_client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=payload))],
+                usage=SimpleNamespace(prompt_tokens=500, completion_tokens=150),
+            )))
+        )
+        c = ForgeLMClient(client=mock_client)
+        out = c.refine_hypotheses("q", hyps)
+        assert all(h.statement.startswith("FORGELM:") for h in out)
+        assert c.usage.cost_usd == 0.0  # $0 local inference cost
+        assert c.usage.calls == 1
+
+    def test_invalid_json_fallback(self):
+        from alphaforge.tools.llm import ForgeLMClient
+
+        hyps = _hyps()
+        orig = [h.statement for h in hyps]
+        mock_client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="invalid-json"))],
+                usage=SimpleNamespace(prompt_tokens=100, completion_tokens=20),
+            )))
+        )
+        c = ForgeLMClient(client=mock_client)
+        out = c.refine_hypotheses("q", hyps)
+        assert [h.statement for h in out] == orig
+        assert c.usage.rejected_outputs == 1
+
+    def test_graph_resolves_forgelm_client(self):
+        from alphaforge.orchestrator.graph import Orchestrator
+        from alphaforge.tools.llm import ForgeLMClient
+
+        client = Orchestrator._default_llm_client("forgelm")
+        assert isinstance(client, ForgeLMClient)
+
